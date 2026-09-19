@@ -18,6 +18,7 @@ APP_DIR = Path(__file__).resolve().parent
 PUBLIC_DIR = APP_DIR / "public"
 MAX_REQUEST = 24 * 1024 * 1024
 
+import app as deployed_app
 import image_input
 import sheet_builder
 
@@ -63,6 +64,13 @@ class GradingHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
+        if self.path.startswith("/api/scores"):
+            from urllib.parse import parse_qs, urlparse
+
+            query = parse_qs(urlparse(self.path).query)
+            contest = deployed_app.contest_name((query.get("contest") or ["default"])[0])
+            self.send_json(200, deployed_app.STORE.standings(contest))
+            return
         if self.path == "/api/health":
             self.send_json(200, {
                 "ready": True,
@@ -74,12 +82,17 @@ class GradingHandler(SimpleHTTPRequestHandler):
                 "heic": image_input.register_formats(),
                 "sheetScanning": sheet_scan is not None,
                 "sheetScanningNote": SHEET_SCAN_ERROR,
+                "scoreboard": {
+                    "kind": deployed_app.STORE.kind,
+                    "shared": deployed_app.STORE.shared and deployed_app.STORE.available,
+                    "note": deployed_app.STORE.reason,
+                },
             })
             return
         super().do_GET()
 
     def do_POST(self) -> None:
-        if self.path not in ("/api/scan", "/api/sheets"):
+        if self.path not in ("/api/scan", "/api/sheets", "/api/score", "/api/scores/clear"):
             self.send_json(404, {"error": "Not found."})
             return
         try:
@@ -87,6 +100,17 @@ class GradingHandler(SimpleHTTPRequestHandler):
             if length <= 0 or length > MAX_REQUEST:
                 raise ValueError("The request is missing or too large.")
             data = json.loads(self.rfile.read(length))
+
+            if self.path == "/api/score":
+                deployed_app.STORE.save(deployed_app.clean_entry(data))
+                self.send_json(200, deployed_app.STORE.standings(
+                    deployed_app.contest_name(data.get("contest"))))
+                return
+
+            if self.path == "/api/scores/clear":
+                contest = deployed_app.contest_name(data.get("contest"))
+                self.send_json(200, {"cleared": deployed_app.STORE.clear(contest), "contest": contest})
+                return
 
             if self.path == "/api/sheets":
                 pdf, filename = sheet_builder.build_sheets(data)

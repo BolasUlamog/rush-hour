@@ -180,6 +180,8 @@ footer { display:flex;justify-content:space-between;padding:15px 2px 0;font-size
 .tally-table th:first-child, .tally-table thead th:first-child { text-align: left; }
 .tally-table tbody th { font: 700 14px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .tally-table tbody tr:first-child td:last-child { color: var(--red-dark); font-weight: 850; }
+.notation.warn { padding: 8px 10px; border-left: 3px solid var(--yellow); background: #fff8df; color: #6a5312; }
+#contestFields { margin-bottom: 10px; }
 .tally-empty { margin: 0; padding: 22px 0; font-size: 12px; color: #74736d; }
 
 @media (max-width: 860px) {

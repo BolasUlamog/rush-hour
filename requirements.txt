@@ -5,6 +5,7 @@ pillow-heif>=0.16     # reads HEIC/HEIF photos straight off an iPhone
 onnxruntime>=1.18     # runs models/glyphs.onnx, the answer-cell character classifier
 numpy>=1.26           # tensor plumbing, and flattening a photo's lighting
 zxing-cpp>=2.2        # decodes the QR square that makes a sheet self-describing
+pg8000>=1.30          # Postgres driver for the shared scoreboard (pure Python, no build step)
 
 # Development only: rasterizes PDFs for the fixtures used by scan.test.py
 pypdfium2>=4.0

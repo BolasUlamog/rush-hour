@@ -11,7 +11,9 @@
    */
   const engine = window.RushHour;
   const MAX_PIXELS = 3000;
-  const STORE_KEY = "gridlock.tally.v2";
+  const STORE_KEY = "gridlock.tally.v2";          // only used when there is no shared database
+  const SETTINGS_KEY = "gridlock.settings.v1";
+  const REFRESH_MS = 8000;
 
   const views = {
     sheets: document.getElementById("sheetsView"),
@@ -43,10 +45,15 @@
   const tallyTable = document.getElementById("tallyTable");
   const exportButton = document.getElementById("exportButton");
   const resetTallyButton = document.getElementById("resetTallyButton");
+  const contestInput = document.getElementById("contestInput");
+  const graderInput = document.getElementById("graderInput");
+  const scoreboardNote = document.getElementById("scoreboardNote");
 
   let sheetImage = null;
   let current = null;      // the puzzle decoded from the sheet being graded
-  let tally = {};
+  let tally = {};          // the local fallback, when no database is configured
+  let standings = null;    // what the server last told us
+  let shared = false;
 
   function setMode(mode) {
     Object.keys(views).forEach(name => {
@@ -72,16 +79,35 @@
     resultBox.append(icon, copy);
   }
 
-  function loadTally() {
+  function contest() {
+    return (contestInput.value || "R1").trim().toUpperCase() || "R1";
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+        contest: contestInput.value, grader: graderInput.value
+      }));
+    } catch (error) { /* a refused localStorage only costs convenience here */ }
+  }
+
+  function loadSettings() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+      if (saved.contest) contestInput.value = saved.contest;
+      if (saved.grader) graderInput.value = saved.grader;
+    } catch (error) { /* ignore */ }
+  }
+
+  function loadLocalTally() {
     try {
       tally = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
     } catch (error) {
       tally = {};
     }
-    renderTally();
   }
 
-  function saveTally() {
+  function saveLocalTally() {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(tally));
     } catch (error) {
@@ -90,26 +116,55 @@
     }
   }
 
-  function teamTotals() {
+  /** Totals from the local fallback, shaped like the server's reply. */
+  function localStandings() {
     const totals = new Map();
+    const entries = [];
     Object.values(tally).forEach(entry => {
+      entries.push(entry);
       const row = totals.get(entry.team) || { team: entry.team, points: 0, sheets: 0, solved: 0 };
-      row.points += entry.awarded;
+      row.points += entry.pointsAwarded;
       row.sheets += 1;
-      row.solved += entry.awarded > 0 ? 1 : 0;
+      row.solved += entry.pointsAwarded > 0 ? 1 : 0;
       totals.set(entry.team, row);
     });
-    return [...totals.values()].sort((a, b) => b.points - a.points || a.team.localeCompare(b.team));
+    return {
+      contest: contest(),
+      teams: [...totals.values()].sort((a, b) => b.points - a.points || a.team.localeCompare(b.team)),
+      entries,
+      shared: false
+    };
+  }
+
+  async function refreshStandings() {
+    try {
+      const response = await fetch(`/api/scores?contest=${encodeURIComponent(contest())}`);
+      if (!response.ok) throw new Error("no scoreboard");
+      standings = await response.json();
+      shared = Boolean(standings.shared);
+    } catch (error) {
+      // No server or no database: fall back to this browser's own tally.
+      loadLocalTally();
+      standings = localStandings();
+      shared = false;
+    }
+    renderTally();
   }
 
   function renderTally() {
-    const totals = teamTotals();
-    document.getElementById("tallyTeams").textContent = totals.length;
-    document.getElementById("tallySheets").textContent = Object.keys(tally).length;
-    document.getElementById("tallyPoints").textContent = totals.reduce((sum, row) => sum + row.points, 0);
+    const data = standings || localStandings();
+    const teams = data.teams || [];
+    document.getElementById("tallyTeams").textContent = teams.length;
+    document.getElementById("tallySheets").textContent = (data.entries || []).length;
+    document.getElementById("tallyPoints").textContent = teams.reduce((sum, row) => sum + row.points, 0);
+
+    scoreboardNote.textContent = shared
+      ? "Shared scoreboard: every volunteer grading this round writes here, and this list refreshes on its own."
+      : "No shared database, so these scores are only on this device. Several volunteers would each keep their own.";
+    scoreboardNote.className = shared ? "notation" : "notation warn";
 
     tallyTable.replaceChildren();
-    if (!totals.length) {
+    if (!teams.length) {
       const empty = document.createElement("p");
       empty.className = "tally-empty";
       empty.textContent = "No sheets graded yet.";
@@ -120,7 +175,7 @@
     const head = document.createElement("thead");
     head.innerHTML = "<tr><th>Team</th><th>Solved</th><th>Sheets</th><th>Points</th></tr>";
     const body = document.createElement("tbody");
-    totals.forEach(row => {
+    teams.forEach(row => {
       const tr = document.createElement("tr");
       [row.team, row.solved, row.sheets, row.points].forEach((value, index) => {
         const cell = document.createElement(index === 0 ? "th" : "td");
@@ -266,7 +321,7 @@
     }
   });
 
-  gradeButton.addEventListener("click", () => {
+  gradeButton.addEventListener("click", async () => {
     if (readout.hidden || !current) return;
     const team = teamInput.value.trim().toUpperCase();
     if (!team) {
@@ -277,31 +332,50 @@
     const outcome = engine.validateSolution(current.cars, movesInput.value);
     const awarded = outcome.status === "success" ? current.points : 0;
     const moves = movesInput.value.trim().split(/\s*\n\s*/).filter(Boolean);
-    const key = `${team}|${current.puzzleCode}`;
-    const replaced = Object.prototype.hasOwnProperty.call(tally, key);
-    tally[key] = {
+    const entry = {
+      contest: contest(),
       team,
-      code: current.puzzleCode,
-      possible: current.points,
-      awarded,
+      puzzle: current.puzzleCode,
+      pointsPossible: current.points,
+      pointsAwarded: awarded,
       status: outcome.status,
-      message: outcome.message,
-      optimal: current.optimal ? current.optimal.length : null,
-      used: moves.length,
       moves: moves.join(" "),
-      at: new Date().toISOString()
+      movesUsed: moves.length,
+      optimal: current.optimal ? current.optimal.length : null,
+      gradedBy: (graderInput.value || "").trim() || null
     };
-    saveTally();
-    renderTally();
 
-    const note = replaced ? " This replaced an earlier score for the same team and puzzle." : "";
+    const efficiency = current.optimal && moves.length === current.optimal.length
+      ? " That is a shortest route."
+      : current.optimal ? ` Shortest possible is ${current.optimal.length}.` : "";
     if (awarded) {
-      const efficiency = current.optimal && moves.length === current.optimal.length
-        ? " That is a shortest route."
-        : current.optimal ? ` Shortest possible is ${current.optimal.length}.` : "";
-      setResult("success", `${team} earns ${awarded} points`, `${outcome.message}${efficiency}${note}`);
+      setResult("success", `${team} earns ${awarded} points`, `${outcome.message}${efficiency}`);
     } else {
-      setResult("error", `${team} earns 0 points on ${current.puzzleCode}`, `${outcome.message}${note}`);
+      setResult("error", `${team} earns 0 points on ${current.puzzleCode}`, outcome.message);
+    }
+    clearSheet(false);
+
+    // Saving replaces any earlier score for this team and puzzle, so a retry
+    // after a dropped connection cannot double-count.
+    try {
+      const response = await fetch("/api/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry)
+      });
+      if (!response.ok) throw new Error((await response.json()).error || "could not save");
+      standings = await response.json();
+      shared = Boolean(standings.shared);
+      renderTally();
+    } catch (error) {
+      loadLocalTally();
+      tally[`${entry.contest}|${team}|${entry.puzzle}`] = entry;
+      saveLocalTally();
+      standings = localStandings();
+      shared = false;
+      renderTally();
+      setResult("partial", `${team}: ${awarded} points, saved on this device only`,
+        `The scoreboard could not be reached (${error.message}), so this score is local. Export the CSV before closing.`);
     }
     clearSheet(false);
   });
@@ -331,42 +405,53 @@
   skipButton.addEventListener("click", () => clearSheet(true));
 
   exportButton.addEventListener("click", () => {
-    if (!Object.keys(tally).length) {
+    const data = standings || localStandings();
+    if (!(data.entries || []).length) {
       setResult("partial", "Nothing to export yet", "Grade at least one sheet first.");
       return;
     }
-    const quote = value => `"${String(value).replace(/"/g, '""')}"`;
-    const stamp = new Date().toISOString().slice(0, 10);
-    const rows = [[`Gridlock Sprint team totals ${stamp}`].map(quote).join(",")];
+    const quote = value => `"${String(value === null || value === undefined ? "" : value).replace(/"/g, '""')}"`;
+    const rows = [[`Gridlock Sprint ${data.contest} team totals`].map(quote).join(",")];
     rows.push(["team", "points", "puzzles solved", "sheets graded"].map(quote).join(","));
-    teamTotals().forEach(row => rows.push([row.team, row.points, row.solved, row.sheets].map(quote).join(",")));
+    data.teams.forEach(row => rows.push([row.team, row.points, row.solved, row.sheets].map(quote).join(",")));
     rows.push("");
     rows.push(["team", "puzzle", "points possible", "points awarded", "result",
-               "moves used", "optimal moves", "moves", "graded at"].map(quote).join(","));
-    Object.values(tally)
-      .sort((a, b) => a.team.localeCompare(b.team) || a.code.localeCompare(b.code))
+               "moves used", "optimal moves", "moves", "graded by", "graded at"].map(quote).join(","));
+    [...data.entries]
+      .sort((a, b) => a.team.localeCompare(b.team) || a.puzzle.localeCompare(b.puzzle))
       .forEach(entry => rows.push([
-        entry.team, entry.code, entry.possible, entry.awarded, entry.status,
-        entry.used, entry.optimal === null ? "" : entry.optimal, entry.moves, entry.at
+        entry.team, entry.puzzle, entry.pointsPossible, entry.pointsAwarded, entry.status,
+        entry.movesUsed, entry.optimal, entry.moves, entry.gradedBy, entry.gradedAt
       ].map(quote).join(",")));
 
     const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `gridlock-scores-${stamp}.csv`;
+    link.download = `gridlock-${data.contest}-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   });
 
-  resetTallyButton.addEventListener("click", () => {
-    const totals = teamTotals();
-    if (!totals.length) return;
-    const points = totals.reduce((sum, row) => sum + row.points, 0);
-    if (!confirm(`Delete every score? ${points} points across ${totals.length} teams will be lost.`)) return;
-    tally = {};
-    localStorage.removeItem(STORE_KEY);
-    renderTally();
-    setResult("neutral", "Scores cleared", "The tally is empty again.");
+  resetTallyButton.addEventListener("click", async () => {
+    const data = standings || localStandings();
+    const points = (data.teams || []).reduce((sum, row) => sum + row.points, 0);
+    if (!(data.entries || []).length) return;
+    const where = shared ? "for everyone grading this round" : "on this device";
+    if (!confirm(`Delete every score in round ${contest()} ${where}? ` +
+                 `${points} points across ${data.teams.length} teams will be lost.`)) return;
+    try {
+      const response = await fetch("/api/scores/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contest: contest() })
+      });
+      if (!response.ok) throw new Error("could not clear");
+    } catch (error) {
+      tally = {};
+      localStorage.removeItem(STORE_KEY);
+    }
+    await refreshStandings();
+    setResult("neutral", `Round ${contest()} cleared`, "The scoreboard is empty again.");
   });
 
   tabs.sheets.addEventListener("click", () => setMode("sheets"));
@@ -387,6 +472,12 @@
     requestAnimationFrame(tick);
   })();
 
+  contestInput.addEventListener("change", () => { saveSettings(); refreshStandings(); });
+  graderInput.addEventListener("change", saveSettings);
+
   setMode("sheets");
-  loadTally();
+  loadSettings();
+  refreshStandings();
+  // Other volunteers are grading at the same time, so keep the board current.
+  setInterval(() => { if (!views.sheets.hidden) refreshStandings(); }, REFRESH_MS);
 })();

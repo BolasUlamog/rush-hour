@@ -104,8 +104,17 @@
             </div>
             <button id="exportButton" class="text-button" type="button">Export CSV</button>
           </div>
+          <div class="make-grid" id="contestFields">
+            <label>Round <small>scores are kept per round</small>
+              <input id="contestInput" type="text" maxlength="40" value="R1">
+            </label>
+            <label>Your name <small>who graded a sheet</small>
+              <input id="graderInput" type="text" maxlength="40" placeholder="volunteer">
+            </label>
+          </div>
+          <p class="notation" id="scoreboardNote"></p>
           <div id="tallyTable" class="tally-table"><p class="tally-empty">No sheets graded yet.</p></div>
-          <button id="resetTallyButton" class="secondary-button" type="button">Clear all scores</button>
+          <button id="resetTallyButton" class="secondary-button" type="button">Clear this round's scores</button>
         </div>
       </aside>
     </section>

@@ -16,9 +16,11 @@ import json
 import traceback
 
 import image_input
+import scores
 import sheet_builder
 
 MAX_REQUEST = 24 * 1024 * 1024
+STORE = scores.ScoreStore()
 
 try:
     import glyph_reader
@@ -45,6 +47,13 @@ def health() -> dict:
         "heic": image_input.register_formats(),
         "scanning": sheet_scan is not None,
         "scanningNote": SCAN_ERROR,
+        "scoreboard": {
+            "kind": STORE.kind,
+            # False means each grader is writing somewhere of their own, which
+            # for several volunteers at once is not what anyone wants.
+            "shared": STORE.shared and STORE.available,
+            "note": STORE.reason,
+        },
     }
 
 
@@ -53,6 +62,36 @@ def scan(payload: dict) -> dict:
         raise RuntimeError(SCAN_ERROR)
     photo = image_input.load_data_url(payload.get("image", ""))
     return sheet_scan.scan_sheet(photo, GLYPHS, WORDS)
+
+
+def contest_name(value: object) -> str:
+    """Scores are scoped to a contest so two rounds cannot mix."""
+    name = str(value or "default").strip().upper()[:40]
+    return name or "DEFAULT"
+
+
+def clean_entry(body: dict) -> dict:
+    """Validate one graded sheet before it reaches the database."""
+    team = str(body.get("team") or "").strip().upper()[:24]
+    puzzle = str(body.get("puzzle") or "").strip().upper()[:40]
+    if not team:
+        raise ValueError("A team ID is required to save a score.")
+    if not puzzle:
+        raise ValueError("A puzzle code is required to save a score.")
+    possible = max(0, min(999, int(body.get("pointsPossible") or 0)))
+    awarded = max(0, min(possible, int(body.get("pointsAwarded") or 0)))
+    return {
+        "contest": contest_name(body.get("contest")),
+        "team": team,
+        "puzzle": puzzle,
+        "pointsPossible": possible,
+        "pointsAwarded": awarded,
+        "status": body.get("status"),
+        "moves": body.get("moves"),
+        "movesUsed": body.get("movesUsed"),
+        "optimal": body.get("optimal"),
+        "gradedBy": body.get("gradedBy"),
+    }
 
 
 def app(environ, start_response):
@@ -89,6 +128,22 @@ def app(environ, start_response):
             pdf, filename = sheet_builder.build_sheets(read_body())
             return reply("200 OK", pdf, "application/pdf",
                          [("Content-Disposition", f'inline; filename="{filename}"')])
+
+        if path == "/api/scores" and method == "GET":
+            from urllib.parse import parse_qs
+
+            contest = (parse_qs(environ.get("QUERY_STRING") or "").get("contest") or ["default"])[0]
+            return json_reply("200 OK", STORE.standings(contest_name(contest)))
+
+        if path == "/api/score" and method == "POST":
+            body = read_body()
+            STORE.save(clean_entry(body))
+            return json_reply("200 OK", STORE.standings(contest_name(body.get("contest"))))
+
+        if path == "/api/scores/clear" and method == "POST":
+            body = read_body()
+            contest = contest_name(body.get("contest"))
+            return json_reply("200 OK", {"cleared": STORE.clear(contest), "contest": contest})
 
         return json_reply("404 Not Found", {"error": f"No route for {method} {path}."})
 

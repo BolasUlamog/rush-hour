@@ -171,11 +171,39 @@ The function bundle measures about 197 MB of Vercel's 250 MB limit, most of it
 onnxruntime, numpy and the two models. Expect roughly 10 s on a cold start and
 6 s warm, so `maxDuration` is set to 60 s.
 
+## Several volunteers grading at once
+
+Scores live in a database, one row per (round, team, puzzle), so grading the same
+sheet twice replaces the score instead of adding to it — a retry after a dropped
+connection cannot double-count. Each grader puts their name in, and the
+scoreboard refreshes itself every few seconds.
+
+Where those scores go depends on what is configured:
+
+| setup | shared between volunteers? |
+| --- | --- |
+| `DATABASE_URL` set to a Postgres URL | yes, wherever it runs |
+| one machine serving the room | yes — SQLite in `output/` |
+| deployed with no database | **no**, each instance keeps its own |
+
+That last case is reported in the app rather than looking like a scoreboard:
+the panel says the scores are only on that device.
+
+**For a contest in one room**, running `Start Grading Station.command` on a Mac
+and having volunteers open its address is the best of both: one shared SQLite
+scoreboard, and Apple's recognizer available as the second reader.
+
+**On Vercel**, add Postgres under Storage in the project (Neon and Supabase both
+work). The integration sets the connection variable itself, so nothing else
+needs changing; `/api/health` then reports `scoreboard.shared: true`.
+
 ## Testing
 
 ```bash
 node engine.test.js            # puzzle rules: parsing, legality, generation
 .venv/bin/python scan.test.py  # prints sheets, fills them in, fakes photos, scans them back
+.venv/bin/python scores.test.py # concurrent grading, replaced scores, separate rounds
+.venv/bin/python levels.test.py # the two tier lists and the two dependency lists agree
 ```
 
 `scan.test.py` renders filled sheets in two handwriting fonts, warps and shades
@@ -247,6 +275,7 @@ the same way in both; change it and you must retrain.
 | `server.py` | the local macOS grading station |
 | `app.py` | the deployed API: one WSGI entrypoint for the same routes |
 | `sheet_builder.py` | turns a generated puzzle set into a printable PDF |
+| `scores.py` | the shared scoreboard, on Postgres or SQLite |
 | `make.js` | the generator page |
 | `sheets.js` | the answer-sheet station and team tally |
 | `fill_sheet.py` | test fixtures: fills a sheet and fakes a photo (dev only) |

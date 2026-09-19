@@ -66,6 +66,25 @@ retry after a dropped connection cannot double-count.
 serves the room, and is not on a serverless host where each instance has its own
 disk. The panel says which.
 
+**The Google Sheet is connected and live.** The Apps Script web app is deployed
+against Damian's
+[rush hour scoring](https://docs.google.com/spreadsheets/d/1dz3JvHJVnyB9i_ex8BslAvjRy7Ozv4wJ2HvjZV_4j58/edit)
+sheet, and `SHEET_WEBHOOK_URL` / `SHEET_TOKEN` are set on Vercel, so
+`/api/health` reports `{"kind": "google sheet", "shared": true}` and the roster
+comes from the sheet's TEAMS tab rather than `teams.txt`. Verified end to end:
+save, re-grade replacing rather than duplicating, clear, and team names.
+
+**Those two values must never be committed — this repo is public.** They live in
+Vercel's environment variables only. Redeploying the Apps Script mints a *new*
+URL, so `SHEET_WEBHOOK_URL` has to be updated whenever that happens, followed by
+a Vercel redeploy: environment changes do not reach a running deployment.
+
+Testing the endpoint by hand has one trap. Apps Script answers `/exec` with a 302
+whose body must be fetched by GET, so `curl -X POST -L` forces POST onto the
+redirect and gets HTTP 405 behind a "Page Not Found" page that looks exactly like
+a broken deployment. Omit `-X POST`. `sheet_store.py` uses urllib, which already
+downgrades correctly.
+
 **Team IDs are corrected against the tournament's closed list of names**
 (`teams.txt`, or the sheet's TEAMS tab): `DANANA` → `BANANA`, always reported,
 never applied when ambiguous.
@@ -103,19 +122,17 @@ cells read as ink; a dark bedspread merging a corner mark into the background).
 
 ## What's next, roughly in order
 
-1. **Connect the Google Sheet.** Paste `google_sheet/Code.gs` into the sheet's
-   Apps Script, set `SHARED_TOKEN`, deploy as a web app (Execute as *Me*, access
-   *Anyone*), then set `SHEET_WEBHOOK_URL` and `SHEET_TOKEN` on Vercel. Until then
-   the deployed scoreboard is per-instance and says so. Damian's sheet is
-   [rush hour scoring](https://docs.google.com/spreadsheets/d/1dz3JvHJVnyB9i_ex8BslAvjRy7Ozv4wJ2HvjZV_4j58/edit),
-   with TEAMS and SCORING tabs; the script writes to its own `Scores` tab and
-   leaves those alone. Sharing on the doc does not need to change: *Execute as Me*
-   means the script acts with Damian's own rights, and what is public is the
-   web-app URL, guarded by the token.
-2. **Discord login for volunteers** — wanted so server roles decide who can grade.
-   Damian is checking with his tech team first; nothing implemented.
-3. Person IDs on sheets stay manual by decision. Teams can be mixed groups, so a
+1. **Discord login for volunteers** — wanted so server roles decide who can
+   grade. **Blocked on the tournament's tech team, by decision:** the Discord
+   permissions and roles already exist, so this should plug into that rather than
+   grow a second login of its own. Nothing implemented, and nothing should be
+   until that conversation happens — building a parallel auth system first is the
+   specific outcome being avoided.
+2. Person IDs on sheets stay manual by decision. Teams can be mixed groups, so a
    team name does not imply a fixed set of people.
+3. A dry run with real printed sheets and real students before the meet. The
+   synthetic fixtures use handwriting *fonts*, so their numbers are a floor, not a
+   prediction, and only three genuine photographs exist to test against.
 
 ## Things already tried and rejected — don't redo them
 

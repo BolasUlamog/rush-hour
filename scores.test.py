@@ -189,6 +189,16 @@ def main() -> int:
         failures.append(f"clear removed {removed}")
     store.clear("OTHER-ROUND")
 
+    # The roster of acceptable team names, which is what lets a misread team ID
+    # be corrected: the list is closed, so an ID not on it is certainly wrong.
+    roster = scores.ScoreStore("").team_names()
+    roster_ok = len(roster) >= 2 and all(name.isupper() for name in roster)
+    print(f"{'ok ' if roster_ok else 'FAIL'} team roster: {len(roster)} names from teams.txt")
+    if not roster_ok:
+        failures.append(f"roster looked wrong: {roster[:5]}")
+    if "teamNames" not in store.standings(contest):
+        failures.append("standings did not include the team names")
+
     # The Google Sheet backend, against a stand-in for the Apps Script web app.
     # This checks the protocol and the client, not Google: the real script is
     # google_sheet/Code.gs and implements the same three actions.

@@ -54,6 +54,7 @@
   let tally = {};          // the local fallback, when no database is configured
   let standings = null;    // what the server last told us
   let shared = false;
+  let teamNames = [];      // the acceptable team names, when the sheet supplies them
 
   function setMode(mode) {
     Object.keys(views).forEach(name => {
@@ -142,6 +143,10 @@
       if (!response.ok) throw new Error("no scoreboard");
       standings = await response.json();
       shared = Boolean(standings.shared);
+      if (Array.isArray(standings.teamNames)) {
+        teamNames = standings.teamNames;
+        fillTeamOptions();
+      }
     } catch (error) {
       // No server or no database: fall back to this browser's own tally.
       loadLocalTally();
@@ -149,6 +154,22 @@
       shared = false;
     }
     renderTally();
+  }
+
+  /** Offer the tournament's team names as autocomplete on the team field. */
+  function fillTeamOptions() {
+    let list = document.getElementById("teamNameList");
+    if (!list) {
+      list = document.createElement("datalist");
+      list.id = "teamNameList";
+      document.body.append(list);
+      teamInput.setAttribute("list", "teamNameList");
+    }
+    list.replaceChildren(...teamNames.map(name => {
+      const option = document.createElement("option");
+      option.value = name;
+      return option;
+    }));
   }
 
   function renderTally() {
@@ -236,25 +257,58 @@
     movesInput.rows = Math.max(6, Math.min(24, lines + 1));
   }
 
+  function editDistance(left, right) {
+    let previous = Array.from({ length: right.length + 1 }, (unused, i) => i);
+    for (let i = 1; i <= left.length; i++) {
+      const current = [i];
+      for (let j = 1; j <= right.length; j++) {
+        current[j] = Math.min(previous[j] + 1, current[j - 1] + 1,
+                              previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1));
+      }
+      previous = current;
+    }
+    return previous[right.length];
+  }
+
   /**
-   * A team already grading this round whose name is one character away.
+   * Correct a scanned team ID against the tournament's list of team names.
    *
-   * A team ID has no restricted alphabet, so B/D/R and 1/I are genuinely hard,
-   * and a misread ID awards a real team's points to a team that does not exist.
-   * The round's own standings are the best correction available, so a near miss
-   * is pointed out — but never applied silently, because two teams really can
-   * have names one letter apart.
+   * A team ID has no restricted alphabet of its own, so B/D/R and 1/I are
+   * genuinely hard to tell apart, and a misread hands a real team's points to a
+   * team that does not exist. The list of acceptable names is closed, though, so
+   * an ID that is not on it is certainly wrong and usually one letter away from
+   * the right answer.
+   *
+   * A single close name is used, and always reported. Anything ambiguous is left
+   * exactly as read for the grader to settle.
    */
-  function nearbyTeam(read) {
-    const known = ((standings && standings.teams) || []).map(row => row.team);
-    if (!read || known.includes(read)) return null;
-    const near = known.filter(name => {
-      if (name.length !== read.length) return false;
-      let differences = 0;
-      for (let i = 0; i < name.length; i++) if (name[i] !== read[i]) differences += 1;
-      return differences === 1;
-    });
-    return near.length === 1 ? near[0] : null;
+  function matchTeam(read) {
+    if (!read || !teamNames.length) return { team: read, note: "" };
+    if (teamNames.includes(read)) return { team: read, note: "" };
+    const scored = teamNames
+      .map(name => ({ name, distance: editDistance(read, name) }))
+      .sort((a, b) => a.distance - b.distance);
+    const best = scored[0];
+    const limit = read.length <= 4 ? 1 : 2;
+    if (!best || best.distance > limit) {
+      return {
+        team: read,
+        note: `“${read}” is not one of the ${teamNames.length} team names. Check the sheet.`
+      };
+    }
+    const tied = scored.filter(row => row.distance === best.distance);
+    if (tied.length > 1) {
+      return {
+        team: read,
+        note: `“${read}” is not a team name; it could be ` +
+              `${tied.slice(0, 3).map(row => row.name).join(" or ")}. Check the sheet.`
+      };
+    }
+    return {
+      team: best.name,
+      note: `Team read as “${read}” and corrected to “${best.name}”, the only team name that close. ` +
+            "Check the sheet before saving."
+    };
   }
 
   function showWarnings(warnings) {
@@ -321,12 +375,9 @@
       const clean = !data.warnings.length;
       confidenceBadge.className = clean ? "good" : "review";
       confidenceBadge.textContent = clean ? `${percent}% clear` : `${percent}% · review`;
-      const suggestion = nearbyTeam(data.team);
-      showWarnings(suggestion
-        ? [`Team read as “${data.team}”, but “${suggestion}” is already grading this round. ` +
-           "Check the sheet before saving — one letter decides whose points these are.",
-           ...data.warnings]
-        : data.warnings);
+      const matched = matchTeam(data.team);
+      teamInput.value = matched.team;
+      showWarnings(matched.note ? [matched.note, ...data.warnings] : data.warnings);
       statusBadge.textContent = data.puzzleCode;
 
       const rowsRead = data.rows.filter(row => row.move).length;

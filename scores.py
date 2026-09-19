@@ -209,6 +209,25 @@ class ScoreStore:
             cursor.execute(self._sql(UPSERT), values)
             connection.commit()
 
+    def team_names(self) -> list[str]:
+        """The acceptable team names, when running without a spreadsheet.
+
+        Set GRIDLOCK_TEAMS to a comma separated list, or put one name per line in
+        teams.txt. An empty list simply means no correction is offered. With a
+        spreadsheet configured the TEAMS tab is used instead of either.
+        """
+        names = [name.strip().upper() for name in (os.environ.get("GRIDLOCK_TEAMS") or "").split(",")]
+        names = [name for name in names if name]
+        if names:
+            return sorted(set(names))
+        roster = APP_DIR / "teams.txt"
+        if roster.is_file():
+            return sorted({
+                line.strip().upper() for line in roster.read_text().splitlines()
+                if line.strip() and not line.lstrip().startswith("#")
+            })
+        return []
+
     def standings(self, contest: str) -> dict:
         """Per-team totals plus every graded sheet, for the live scoreboard."""
         self.ensure_schema()
@@ -230,7 +249,8 @@ class ScoreStore:
             team["sheets"] += 1
             team["solved"] += 1 if entry["pointsAwarded"] > 0 else 0
         ordered = sorted(totals.values(), key=lambda row: (-row["points"], row["team"]))
-        return {"contest": contest, "teams": ordered, "entries": entries, "shared": self.shared}
+        return {"contest": contest, "teams": ordered, "entries": entries,
+                "teamNames": self.team_names(), "shared": self.shared}
 
     def clear(self, contest: str) -> int:
         self.ensure_schema()

@@ -98,8 +98,14 @@ class SheetStore:
             "contest": contest,
             "teams": answer.get("teams", []),
             "entries": answer.get("entries", []),
+            # The acceptable team names come back with the standings so the
+            # grading station can correct a misread ID without another call.
+            "teamNames": answer.get("teamNames", []),
             "shared": True,
         }
+
+    def team_names(self) -> list[str]:
+        return list(self._call({"action": "teams"}).get("teamNames", []))
 
     def clear(self, contest: str) -> int:
         return int(self._call({"action": "clear", "contest": contest}).get("cleared", 0))

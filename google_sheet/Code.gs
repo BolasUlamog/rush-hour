@@ -13,7 +13,11 @@
  */
 
 const SHARED_TOKEN = "change-me";      // must match SHEET_TOKEN in the app
-const TAB = "Scores";
+const TAB = "Scores";                  // created by this script; your own tabs are left alone
+const TEAMS_TAB = "TEAMS";             // where the acceptable team names live
+// Labels that sit among the team names and are not teams.
+const NOT_A_TEAM = ["TEAM", "TEAMS", "PERSON ID", "PERSON", "TIME", "POINT VALUE", "POINTS",
+                    "CORRECT?", "CORRECT", "SCORE", "SCORING", "TOTAL", "NAME", "ID"];
 const HEADERS = [
   "contest", "team", "puzzle", "points possible", "points awarded", "result",
   "moves used", "optimal", "moves", "graded by", "graded at",
@@ -36,6 +40,30 @@ function rowsOf_(tab) {
   const last = tab.getLastRow();
   if (last < 2) return [];
   return tab.getRange(2, 1, last - 1, HEADERS.length).getValues();
+}
+
+/**
+ * The acceptable team names, read from the TEAMS tab.
+ *
+ * The grading station uses these to correct a misread team ID: the list is
+ * closed, so an ID that is not on it is certainly wrong. Names are looked for
+ * anywhere on the tab rather than in a fixed range, because the sheet's layout
+ * is still being worked out — down a column or across a row both work.
+ */
+function teams_() {
+  const book = SpreadsheetApp.getActiveSpreadsheet();
+  const tab = book.getSheetByName(TEAMS_TAB);
+  if (!tab || tab.getLastRow() === 0) return [];
+  const values = tab.getRange(1, 1, tab.getLastRow(), tab.getLastColumn()).getValues();
+  const found = [];
+  values.forEach(row => row.forEach(cell => {
+    const name = String(cell || "").trim().toUpperCase();
+    if (!name) return;
+    if (NOT_A_TEAM.indexOf(name) >= 0) return;
+    if (!/^[A-Z][A-Z0-9 \-]{2,19}$/.test(name)) return;
+    if (found.indexOf(name) < 0) found.push(name);
+  }));
+  return found.sort();
 }
 
 function reply_(value) {
@@ -114,7 +142,12 @@ function handle_(body) {
     const action = String(body.action || "standings");
     if (action === "save") return reply_(save_(tab, body));
     if (action === "clear") return reply_(clear_(tab, String(body.contest || "")));
-    if (action === "standings") return reply_(standings_(tab, String(body.contest || "")));
+    if (action === "standings") {
+      const answer = standings_(tab, String(body.contest || ""));
+      answer.teamNames = teams_();
+      return reply_(answer);
+    }
+    if (action === "teams") return reply_({ ok: true, teamNames: teams_() });
     return reply_({ ok: false, error: "Unknown action " + action });
   } finally {
     lock.releaseLock();

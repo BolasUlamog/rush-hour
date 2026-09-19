@@ -1,0 +1,23 @@
+# The tournament's acceptable team names, one per line.
+#
+# The grading station uses these to correct a misread team ID: the list is
+# closed, so a scanned ID that is not on it is certainly wrong, and usually one
+# letter away from the right answer. Without this list no correction is offered.
+#
+# With a Google Sheet configured its TEAMS tab is read instead, so the roster
+# can be edited during the contest without touching the app.
+BANANA
+CHERRY
+DAMSON
+ORANGE
+PAPAYA
+QUINCE
+RAISIN
+TOMATO
+DURIAN
+LYCHEE
+LOQUAT
+POTATO
+CARROT
+CELERY
+GARLIC

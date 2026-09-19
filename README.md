@@ -203,6 +203,16 @@ sheet's owner.
 4. Give the app `SHEET_WEBHOOK_URL` (that URL) and `SHEET_TOKEN` (the same
    string). On Vercel those go in Settings > Environment Variables.
 
+The script also reads a **TEAMS** tab for the tournament's acceptable team names,
+looking anywhere on it so a list down a column or across a row both work. Those
+names are what let a misread team ID be corrected: the list is closed, so a
+scanned ID that is not on it is certainly wrong. `DANANA` becomes `BANANA`, and
+the grader is told it happened. Anything not within a letter or two of exactly
+one name is left as read, with the candidates named.
+
+Without a spreadsheet the same list is read from [`teams.txt`](teams.txt), or
+from `GRIDLOCK_TEAMS` as a comma separated list.
+
 "Anyone" means anyone holding the URL can post to it, which is what the token is
 for. Nothing else about the sheet is exposed.
 

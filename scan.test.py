@@ -220,6 +220,44 @@ def main() -> int:
     else:
         print("skip real photo, struck row: tests/real-sheet-struck.jpg is not present")
 
+    # A sheet photographed on a soft surface, so the paper bows. Undoing the
+    # camera's perspective from four corner marks assumes a flat page, and a bow
+    # leaves rows slightly off — enough that a faint stroke can be clipped. This
+    # is also the hardest sheet here: 25 rows over two blocks, written lightly.
+    #
+    # It is kept because it is the one case where both readers can agree on the
+    # same wrong faint digit, which row-level flagging cannot catch. The route
+    # then fails validation and names the move, so the grader is still told where
+    # to look. Row-by-row snapping to the printed rules was tried to fix the bow
+    # and measured as a wash across the three real photos, so it was dropped.
+    curled_ok = True
+    curled_photo = APP_DIR / "tests" / "real-sheet-curled.jpg"
+    if curled_photo.exists():
+        written = {1: "EL1", 2: "CD1", 3: "FU1", 4: "KU1", 5: "XL2", 6: "JU2", 7: "DR2",
+                   8: "LU1", 9: "MD3", 10: "XR1", 11: "BL1", 12: "GU1", 14: "HU1", 15: "NU1",
+                   16: "AU1", 17: "EL3", 18: "LD1", 19: "MD1", 20: "DL2", 21: "JD2", 22: "XR2"}
+        read = sheet_scan.scan_sheet(image_input.load_path(curled_photo), glyph_model,
+                                     apple_text, lines=line_reader.LineReader())
+        struck = [row["row"] for row in read["rows"] if row["struck"]]
+        invented = [row["row"] for row in read["rows"] if row["row"] >= 23 and row["move"]]
+        rows = [row for row in read["rows"] if not row["struck"]]
+        correct = sum(1 for row in rows if row["move"] == written.get(row["row"]))
+        curled_ok = (
+            read["puzzleCode"] == "GS-G-001"
+            and read["points"] == 15
+            and read["sheetRows"] == 25
+            and struck == [13]        # row 13 is scratched out on the paper
+            and not invented          # rows 23-25 are blank
+            and correct >= 17         # 18 of 21 when this was recorded
+        )
+        print(f"{'ok ' if curled_ok else 'FAIL'} real photo, curled page: code={read['puzzleCode']} "
+              f"rows {correct}/{len(written)} struck={struck}")
+        if not curled_ok:
+            failures.append(
+                f"curled photo: code={read['puzzleCode']} rows={correct}/{len(written)} "
+                f"struck={struck} invented={invented}"
+            )
+
     # The deployed server has no Apple recognizer, so the path it actually runs
     # — character model plus the PP-OCR line reader — is checked here too.
     deployed_ok = True
@@ -309,7 +347,7 @@ def main() -> int:
             print(f"  - {failure}")
     passed = pages_right == total and teams_right == total and rows_silent_wrong == 0
     return 0 if (passed and upside_ok and cropped_ok and heic_ok and real_ok and struck_ok
-                 and deployed_ok and not failures) else 1
+                 and curled_ok and deployed_ok and not failures) else 1
 
 
 if __name__ == "__main__":

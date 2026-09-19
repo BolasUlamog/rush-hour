@@ -228,31 +228,43 @@ def find_marks(image: Image.Image) -> dict[str, tuple[float, float]]:
         window = gray.crop(box)
         histogram = window.histogram()
         low, high = percentile(histogram, 0.04), percentile(histogram, 0.96)
-        cutoff = low + (high - low) * 0.45 if high - low > 30 else 110
-        mask = window.point(lambda value: 1 if value <= cutoff else 0)
-        data = mask.tobytes()
+        # A registration mark is far darker than anything else printed on the
+        # paper, so the first cutoff is taken from the paper's own brightness.
+        # A sheet photographed on a dark surface used to defeat a mid-way
+        # threshold: the background came out as "ink" too, merged with a mark
+        # near the page edge, and the pair was thrown away for being too big.
+        # Looser cutoffs follow for a dim photo where the marks are not that dark.
+        cutoffs = [high * 0.40, high * 0.55]
+        if high - low > 30:
+            cutoffs.append(low + (high - low) * 0.45)
+        else:
+            cutoffs.append(110)
         # The mark sits a fixed fraction in from the page corner; prefer blobs there.
         inset = (L.MARK_INSET + L.MARK_SIZE / 2)
         want_x = (inset / L.PAGE_W) * page_w if ax == 0 else window.width - (inset / L.PAGE_W) * page_w
         want_y = (inset / L.PAGE_H) * page_h if ay == 0 else window.height - (inset / L.PAGE_H) * page_h
 
         best = None
-        for area, x0, y0, x1, y1, cx, cy in components(data, window.width, window.height):
-            box_w, box_h = x1 - x0 + 1, y1 - y0 + 1
-            if not (expected * 0.5 <= box_w <= expected * 2.3):
-                continue
-            if not (expected * 0.5 <= box_h <= expected * 2.3):
-                continue
-            aspect = box_w / box_h
-            if not 0.6 <= aspect <= 1.65:
-                continue
-            fill = area / (box_w * box_h)
-            if fill < 0.78:
-                continue
-            distance = ((cx - want_x) ** 2 + (cy - want_y) ** 2) ** 0.5
-            score = distance / max(1.0, expected) - fill * 2.0 - min(1.0, area / (expected * expected))
-            if best is None or score < best[0]:
-                best = (score, cx + box[0], cy + box[1])
+        for cutoff in cutoffs:
+            mask = window.point(lambda value, limit=cutoff: 1 if value <= limit else 0)
+            for area, x0, y0, x1, y1, cx, cy in components(mask.tobytes(), window.width, window.height):
+                box_w, box_h = x1 - x0 + 1, y1 - y0 + 1
+                if not (expected * 0.5 <= box_w <= expected * 2.3):
+                    continue
+                if not (expected * 0.5 <= box_h <= expected * 2.3):
+                    continue
+                aspect = box_w / box_h
+                if not 0.6 <= aspect <= 1.65:
+                    continue
+                fill = area / (box_w * box_h)
+                if fill < 0.78:
+                    continue
+                distance = ((cx - want_x) ** 2 + (cy - want_y) ** 2) ** 0.5
+                score = distance / max(1.0, expected) - fill * 2.0 - min(1.0, area / (expected * expected))
+                if best is None or score < best[0]:
+                    best = (score, cx + box[0], cy + box[1])
+            if best is not None:
+                break          # the darkest cutoff that works is the most trustworthy
         if best is None:
             raise ScanError(
                 f"Could not find the {corner.upper()} corner mark. Photograph the whole sheet, "

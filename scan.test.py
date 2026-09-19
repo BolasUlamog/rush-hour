@@ -20,10 +20,12 @@ from pathlib import Path
 
 from PIL import Image
 
+import glyph_reader
 import image_input
 import packet_pdf
 import sheet_layout
 import sheet_scan
+import text_reader
 import fill_sheet
 
 APP_DIR = Path(__file__).resolve().parent
@@ -66,10 +68,10 @@ def build_packet() -> dict:
 def main() -> int:
     manifest = build_packet()
     WORK.mkdir(parents=True, exist_ok=True)
-    binary = sheet_scan.ensure_recognizer(
-        APP_DIR / "handwriting_ocr.swift",
-        Path(tempfile.gettempdir()) / "gridlock-handwriting-ocr",
-    )
+    glyph_model = glyph_reader.GlyphReader()
+    apple_text = text_reader.TextReader()
+    print(f"readers: glyph model {'ready' if glyph_model.available else 'MISSING'}, "
+          f"Apple text recognizer {'ready' if apple_text.available else 'unavailable'}")
 
     total = moves_right = pages_right = teams_right = 0
     rows_total = rows_auto = rows_flagged = rows_silent_wrong = 0
@@ -87,7 +89,7 @@ def main() -> int:
 
         total += 1
         try:
-            result = sheet_scan.scan_sheet(Image.open(photo), binary)
+            result = sheet_scan.scan_sheet(Image.open(photo), glyph_model, apple_text)
         except sheet_scan.ScanError as error:
             failures.append(f"case {number} (page {page}, {style}): scan failed — {error}")
             continue
@@ -152,7 +154,7 @@ def main() -> int:
     photo = stem.with_name("upside-down-photo.jpg")
     fill_sheet.fake_photo(stem.with_suffix(".png"), photo, seed=9, rotate180=True)
     try:
-        flipped = sheet_scan.scan_sheet(Image.open(photo), binary)
+        flipped = sheet_scan.scan_sheet(Image.open(photo), glyph_model, apple_text)
         upside_ok = flipped["puzzleCode"] == puzzle["code"] and flipped["moves"] == expected
         print(f"{'ok ' if upside_ok else 'FAIL'} upside down: code={flipped['puzzleCode']} "
               f"moves={len(flipped['moves'])}/{len(expected)}")
@@ -170,7 +172,7 @@ def main() -> int:
     real_photo = APP_DIR / "tests" / "real-sheet.jpg"
     if real_photo.exists():
         expected_route = ["AD1", "JR1", "CU1", "HL4", "FL3", "CD1", "JL1", "CD1", "AD2", "XR4"]
-        read = sheet_scan.scan_sheet(image_input.load_path(real_photo), binary)
+        read = sheet_scan.scan_sheet(image_input.load_path(real_photo), glyph_model, apple_text)
         struck = [row["row"] for row in read["rows"] if row["struck"]]
         invented = [row["row"] for row in read["rows"] if row["row"] > 11 and row["move"]]
         real_ok = (
@@ -197,7 +199,7 @@ def main() -> int:
     if struck_photo.exists():
         expected_route = ["MD2", "AD2", "CR1", "EU1", "JL1", "GR2", "FR2", "KU2",
                           "HU1", "LL2", "MD1", "AD1", "XR3"]
-        read = sheet_scan.scan_sheet(image_input.load_path(struck_photo), binary)
+        read = sheet_scan.scan_sheet(image_input.load_path(struck_photo), glyph_model, apple_text)
         struck = [row["row"] for row in read["rows"] if row["struck"]]
         invented = [row["row"] for row in read["rows"] if row["row"] >= 15 and row["move"]]
         struck_ok = (
@@ -229,7 +231,7 @@ def main() -> int:
         heic_path = WORK / "iphone.heic"
         pillow_heif.from_pillow(source).save(heic_path, format="HEIF", quality=80)
         photo = image_input.load_path(heic_path)
-        read = sheet_scan.scan_sheet(photo, binary)
+        read = sheet_scan.scan_sheet(photo, glyph_model, apple_text)
         heic_ok = read["puzzleCode"] == puzzle["code"] and read["moves"] == expected
         print(f"{'ok ' if heic_ok else 'FAIL'} heic photo: code={read['puzzleCode']} "
               f"moves={len(read['moves'])}/{len(expected)}")
@@ -252,7 +254,7 @@ def main() -> int:
     photo = stem.with_name("cropped-photo.jpg")
     fill_sheet.fake_photo(stem.with_suffix(".png"), photo, seed=3, crop_corner=True)
     try:
-        sheet_scan.scan_sheet(Image.open(photo), binary)
+        sheet_scan.scan_sheet(Image.open(photo), glyph_model, apple_text)
         cropped_ok = False
         failures.append("missing corner: the scan should have been refused")
     except sheet_scan.ScanError as error:

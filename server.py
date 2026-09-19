@@ -15,21 +15,23 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent
+PUBLIC_DIR = APP_DIR / "public"
 MAX_REQUEST = 24 * 1024 * 1024
-LOCAL_OCR_SOURCE = APP_DIR / "handwriting_ocr.swift"
-LOCAL_OCR_BINARY = Path(tempfile.gettempdir()) / "gridlock-handwriting-ocr"
 
 import image_input
-import levels
-import packet_pdf
-import sheet_code
+import sheet_builder
 
 try:  # Answer-sheet scanning needs Pillow; sheet building still works without it.
+    import glyph_reader
     import sheet_scan
+    import text_reader
 
+    GLYPHS = glyph_reader.GlyphReader()
+    WORDS = text_reader.TextReader()
     SHEET_SCAN_ERROR = ""
 except Exception as error:  # pragma: no cover - depends on the local interpreter
     sheet_scan = None
+    GLYPHS = WORDS = None
     SHEET_SCAN_ERROR = (
         f"Answer-sheet scanning is unavailable ({error}). Run the grading station with the "
         "project virtualenv: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
@@ -42,7 +44,7 @@ def json_bytes(value: object) -> bytes:
 
 class GradingHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(APP_DIR), **kwargs)
+        super().__init__(*args, directory=str(PUBLIC_DIR), **kwargs)
 
     def end_headers(self) -> None:
         # Never let a grading laptop keep running a cached copy of the app after
@@ -64,7 +66,11 @@ class GradingHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/health":
             self.send_json(200, {
                 "ready": True,
-                "recognizer": "on-device Apple Vision + glyph model",
+                "readers": {
+                    "glyphModel": bool(GLYPHS and GLYPHS.available),
+                    "appleText": bool(WORDS and WORDS.available),
+                    "appleTextNote": (WORDS.reason if WORDS and not WORDS.available else ""),
+                },
                 "heic": image_input.register_formats(),
                 "sheetScanning": sheet_scan is not None,
                 "sheetScanningNote": SHEET_SCAN_ERROR,
@@ -73,7 +79,7 @@ class GradingHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:
-        if self.path not in ("/api/scan-sheet", "/api/sheets"):
+        if self.path not in ("/api/scan", "/api/sheets"):
             self.send_json(404, {"error": "Not found."})
             return
         try:
@@ -83,7 +89,7 @@ class GradingHandler(SimpleHTTPRequestHandler):
             data = json.loads(self.rfile.read(length))
 
             if self.path == "/api/sheets":
-                pdf, filename = build_sheets(data)
+                pdf, filename = sheet_builder.build_sheets(data)
                 self.send_response(200)
                 self.send_header("Content-Type", "application/pdf")
                 self.send_header("Content-Disposition", f'inline; filename="{filename}"')
@@ -99,79 +105,22 @@ class GradingHandler(SimpleHTTPRequestHandler):
             self.send_json(500, {"error": f"Could not handle that request: {error}"})
 
 
-MAX_PUZZLES = 60
-
-
-def clean_puzzles(raw: object) -> list[dict]:
-    """Validate the puzzle list a browser asked us to lay out."""
-    if not isinstance(raw, list) or not raw:
-        raise ValueError("Send at least one puzzle to print.")
-    if len(raw) > MAX_PUZZLES:
-        raise ValueError(f"That is more than {MAX_PUZZLES} puzzles; print them in batches.")
-    puzzles = []
-    for index, item in enumerate(raw, 1):
-        if not isinstance(item, dict):
-            raise ValueError(f"Puzzle {index} is not readable.")
-        cars = item.get("cars")
-        if not isinstance(cars, list) or not cars:
-            raise ValueError(f"Puzzle {index} has no cars.")
-        level = str(item.get("level", "medium")).lower()
-        if level not in levels.LEVELS:
-            raise ValueError(f"Puzzle {index} has an unknown level {level!r}.")
-        solution = [str(move).upper() for move in item.get("solution", []) if str(move).strip()]
-        puzzle = {
-            "index": index,
-            "code": str(item.get("code") or f"GS-{index:03d}").upper(),
-            "level": level,
-            "points": max(0, min(99, int(item.get("points", 0)))),
-            "shortestMoves": max(1, min(40, int(item.get("shortestMoves", len(solution) or 1)))),
-            "cars": [{
-                "id": str(car["id"]).upper(),
-                "row": int(car["row"]),
-                "col": int(car["col"]),
-                "length": int(car["length"]),
-                "orientation": str(car["orientation"]).upper(),
-            } for car in cars],
-            "solution": solution,
-        }
-        # sheet_code refuses anything that will not survive the QR round trip.
-        sheet_code.encode(puzzle["code"], puzzle["points"], 8, puzzle["cars"])
-        puzzles.append(puzzle)
-    return puzzles
-
-
-def build_sheets(data: dict) -> tuple[bytes, str]:
-    """Lay out a packet or its answer key and hand back the PDF."""
-    kind = "key" if str(data.get("kind", "packet")).lower() == "key" else "packet"
-    puzzles = clean_puzzles(data.get("puzzles"))
-    packet_id = str(data.get("packetId") or "GS-SHEETS").upper()[:40]
-    manifest = {
-        "packetId": packet_id,
-        "title": str(data.get("title") or "Middle School Math Meet")[:80],
-        "round": str(data.get("round") or "Gridlock Sprint")[:80],
-        "puzzles": puzzles,
-        "totalPoints": sum(puzzle["points"] for puzzle in puzzles),
-    }
-    filename = f"gridlock-{packet_id}-{'key' if kind == 'key' else 'sheets'}.pdf"
-    return packet_pdf.render_bytes(manifest, kind), filename
-
-
 def scan_answer_sheet(image: str) -> dict:
     """Read one photographed answer sheet. The sheet describes its own puzzle."""
     if sheet_scan is None:
         raise RuntimeError(SHEET_SCAN_ERROR)
-    binary = sheet_scan.ensure_recognizer(LOCAL_OCR_SOURCE, LOCAL_OCR_BINARY)
     # The page may send a re-encoded JPEG or, when the browser cannot decode the
     # file itself, the original photo — HEIC straight off an iPhone included.
     photo = image_input.load_data_url(image)
     try:
-        return sheet_scan.scan_sheet(photo, binary)
+        return sheet_scan.scan_sheet(photo, GLYPHS, WORDS)
     except sheet_scan.ScanError as error:
         raise ValueError(str(error)) from error
 
 
 def main() -> None:
-    print("Handwriting reader: on-device — nothing leaves this Mac")
+    print(f"Readers: glyph model {'ready' if GLYPHS and GLYPHS.available else 'MISSING'}, "
+          f"Apple text recognizer {'ready' if WORDS and WORDS.available else 'unavailable'}")
     if not image_input.register_formats():
         print("HEIC photos unsupported: pip install -r requirements.txt to add pillow-heif")
     if SHEET_SCAN_ERROR:

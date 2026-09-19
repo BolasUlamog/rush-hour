@@ -32,6 +32,7 @@ from PIL import Image, ImageFilter
 import glyph_reader
 import sheet_code
 import sheet_layout as L
+import text_reader as text_reader_module
 
 SCAN_DPI = 220
 GLYPH_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -484,27 +485,15 @@ def group_by_box(glyphs: list[dict]) -> list[list[dict]]:
     return groups
 
 
-def read_digest(binary: Path, digest: Image.Image, slot_map: list[dict]) -> dict:
+def read_digest(words: "text_reader_module.TextReader", digest: Image.Image,
+                slot_map: list[dict]) -> dict:
     """Recognize the digest and hand every word back to the slot it came from.
 
     Returns per-slot readings plus whole-line readings. Both are needed: the
     recognizer sometimes boxes "B U 1" as three words and sometimes as one, and a
     single box spanning three columns has to be split back out by position.
     """
-    with tempfile.TemporaryDirectory() as folder:
-        image_path = Path(folder) / "digest.png"
-        digest.save(image_path)
-        regions_path = Path(folder) / "regions.json"
-        regions_path.write_text(json.dumps([
-            {"id": "digest", "rect": [0, 0, digest.width, digest.height]}
-        ]))
-        process = subprocess.run(
-            [str(binary), str(image_path), "--regions", str(regions_path)],
-            capture_output=True, text=True, timeout=90,
-        )
-    if process.returncode != 0:
-        raise ScanError(process.stderr.strip() or "On-device recognition failed.")
-    results = json.loads(process.stdout)
+    results = words.read(digest, [{"id": "digest", "rect": [0, 0, digest.width, digest.height]}])
     candidates = results[0]["candidates"] if results else []
 
     slots: dict[tuple, dict[str, float]] = {}
@@ -824,55 +813,47 @@ def parse_line_move(text: str, car_ids: list[str]) -> tuple[str, str, str] | Non
     return None
 
 
-def read_sheet_code(binary: Path, page_image: Image.Image) -> tuple[dict, dict] | None:
+def read_sheet_code(page_image: Image.Image) -> tuple[dict, dict] | None:
     """Decode the QR square, returning (puzzle, where it sits on the page).
 
     A QR decodes whichever way up it is photographed, so its position is what
-    tells us whether the page itself is upside down.
+    tells us whether the page itself is upside down. zxing-cpp is used rather
+    than Apple's barcode detector so this works off a Mac as well as on one.
     """
-    with tempfile.TemporaryDirectory() as folder:
-        path = Path(folder) / "page.png"
-        page_image.save(path)
-        process = subprocess.run(
-            [str(binary), str(path), "--barcodes"],
-            capture_output=True, text=True, timeout=60,
-        )
-    if process.returncode != 0:
-        raise ScanError(process.stderr.strip() or "Could not look for the sheet's QR code.")
-    for found in json.loads(process.stdout or "[]"):
+    try:
+        import zxingcpp
+    except ImportError as error:  # pragma: no cover - depends on the install
+        raise ScanError(
+            "The QR reader is missing. Install the requirements: "
+            "pip install -r requirements.txt"
+        ) from error
+
+    width, height = page_image.size
+    for found in zxingcpp.read_barcodes(page_image):
         try:
-            puzzle = sheet_code.decode(found.get("payload", ""))
+            puzzle = sheet_code.decode(found.text or "")
         except sheet_code.SheetCodeError:
             continue
-        return puzzle, found
+        corners = found.position
+        xs = [corners.top_left.x, corners.top_right.x, corners.bottom_right.x, corners.bottom_left.x]
+        ys = [corners.top_left.y, corners.top_right.y, corners.bottom_right.y, corners.bottom_left.y]
+        placement = {
+            "x": min(xs) / max(1, width),
+            "y": min(ys) / max(1, height),
+            "w": (max(xs) - min(xs)) / max(1, width),
+            "h": (max(ys) - min(ys)) / max(1, height),
+        }
+        return puzzle, placement
     return None
 
 
-def ensure_recognizer(source: Path, binary: Path) -> Path:
-    """Compile the on-device recognizer once, next to the app's temp files."""
-    if binary.exists() and binary.stat().st_mtime >= source.stat().st_mtime:
-        return binary
-    import os
-
-    environment = os.environ.copy()
-    cache = Path(tempfile.gettempdir())
-    environment["SWIFT_MODULECACHE_PATH"] = str(cache / "gridlock-swift-cache")
-    environment["CLANG_MODULE_CACHE_PATH"] = str(cache / "gridlock-clang-cache")
-    process = subprocess.run(
-        ["/usr/bin/swiftc", str(source), "-o", str(binary)],
-        capture_output=True, text=True, timeout=120, env=environment,
-    )
-    if process.returncode != 0:
-        raise ScanError(process.stderr.strip() or "The on-device recognizer could not be prepared.")
-    return binary
-
-
-def scan_sheet(image: Image.Image, binary: Path, dpi: int = SCAN_DPI,
-               reader: glyph_reader.GlyphReader | None = None) -> dict:
+def scan_sheet(image: Image.Image, glyphs: glyph_reader.GlyphReader | None = None,
+               text: "text_reader_module.TextReader | None" = None,
+               dpi: int = SCAN_DPI) -> dict:
     """Read one photographed answer sheet using only what is printed on it."""
     image = image.convert("RGB")
-    if reader is None:
-        reader = glyph_reader.GlyphReader()
+    reader = glyphs if glyphs is not None else glyph_reader.GlyphReader()
+    words = text if text is not None else text_reader_module.TextReader()
     marks = find_marks(image)
     validate_marks(marks)
 
@@ -886,7 +867,7 @@ def scan_sheet(image: Image.Image, binary: Path, dpi: int = SCAN_DPI,
     decoded = None
     for rotation in order:
         page_image = rectify(image, marks, rotation, dpi)
-        found = read_sheet_code(binary, page_image)
+        found = read_sheet_code(page_image)
         if found is None:
             continue
         puzzle, placement = found
@@ -903,13 +884,14 @@ def scan_sheet(image: Image.Image, binary: Path, dpi: int = SCAN_DPI,
         )
 
     puzzle, page_image, rotation = decoded
-    result = read_page(page_image, puzzle, binary, dpi, reader)
+    result = read_page(page_image, puzzle, dpi, reader, words)
     result["rotation"] = rotation
     return result
 
 
-def read_page(page_image: Image.Image, puzzle: dict, binary: Path, dpi: int,
-              reader: glyph_reader.GlyphReader) -> dict:
+def read_page(page_image: Image.Image, puzzle: dict, dpi: int,
+              reader: glyph_reader.GlyphReader,
+              words: "text_reader_module.TextReader") -> dict:
     """Read the team ID and the answer rows off an already flattened page."""
     sheet = Sheet(page_image, dpi)
     # The sheet's own QR states how many answer rows it was printed with, so the
@@ -941,16 +923,16 @@ def read_page(page_image: Image.Image, puzzle: dict, binary: Path, dpi: int,
             cell_crops[("team", -1, f"team{box_index}")] = crop
     glyphs = read_glyphs(reader, page, cell_crops, car_ids) if reader.available else {}
 
-    slots: dict[tuple, list[dict]] = {}
+    slots: dict[tuple, list[dict]] = {key: list(value) for key, value in glyphs.items()}
     lines: dict[tuple, list[dict]] = {}
-    if used_rows or cell_crops:
+    if (used_rows or cell_crops) and words.available:
         # Two passes: a compact line reads a full row best, while the same line
         # written out twice is what makes the recognizer notice a lone character.
         single = compose_digest(sheet, page, used_rows, copies=1)
         doubled = compose_digest(sheet, page, used_rows, copies=2)
         readings = merge_readings(
-            read_digest(binary, single[0], single[1]),
-            read_digest(binary, doubled[0], doubled[1]),
+            read_digest(words, single[0], single[1]),
+            read_digest(words, doubled[0], doubled[1]),
         )
         lines = readings["lines"]
         slots = {
@@ -1066,7 +1048,10 @@ def read_page(page_image: Image.Image, puzzle: dict, binary: Path, dpi: int,
         "moves": moves,
         "confidence": round(min(scores), 3) if scores else 0.0,
         "warnings": warnings,
-        "source": "glyph model + on-device text" if reader.available else "on-device text only",
+        "source": ("glyph model + Apple text recognizer" if reader.available and words.available
+                   else "glyph model only" if reader.available
+                   else "Apple text recognizer only" if words.available
+                   else "no reader available"),
     }
 
 
@@ -1078,13 +1063,10 @@ def main() -> None:
     parser.add_argument("--dpi", type=int, default=SCAN_DPI)
     arguments = parser.parse_args()
 
-    app_dir = Path(__file__).resolve().parent
-    binary = ensure_recognizer(app_dir / "handwriting_ocr.swift",
-                               Path(tempfile.gettempdir()) / "gridlock-handwriting-ocr")
     import image_input
 
     image = image_input.load_path(arguments.image)
-    print(json.dumps(scan_sheet(image, binary, arguments.dpi), indent=2))
+    print(json.dumps(scan_sheet(image, dpi=arguments.dpi), indent=2))
 
 
 if __name__ == "__main__":

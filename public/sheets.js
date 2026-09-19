@@ -221,7 +221,7 @@
     scanButton.firstChild.textContent = "Reading the sheet… ";
     statusBadge.textContent = "Reading";
     try {
-      const response = await fetch("/api/scan-sheet", {
+      const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: sheetImage })

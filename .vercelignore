@@ -1,0 +1,15 @@
+.venv/
+.venv-train/
+__pycache__/
+output/
+tmp/
+tests/
+models/glyphs.pt
+
+# Development-only tooling, not needed by the deployment
+fill_sheet.py
+train_glyph_model.py
+*.test.py
+engine.test.js
+handwriting_ocr.swift
+Start Grading Station.command

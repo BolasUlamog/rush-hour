@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/*.py": {
+      "runtime": "@vercel/python@5.0.2",
+      "includeFiles": "{*.py,models/**}",
+      "maxDuration": 60,
+      "memory": 2048
+    }
+  },
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" }
+  ]
+}

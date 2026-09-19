@@ -22,6 +22,13 @@ from PIL import Image
 import glyph_preprocess
 
 MODEL = Path(__file__).resolve().parent / "models" / "glyphs.onnx"
+# Each glyph is classified from several slightly warped views and the results
+# averaged. Handwriting arrives at a small angle and scale that the training
+# augmentation only partly covers, and averaging views both raises accuracy and
+# makes the confidence mean something: views that disagree pull it down. This
+# matters most where Apple's text recognizer is unavailable and the model has no
+# second opinion to be checked against.
+VIEWS = ((0.0, 1.0), (-7.0, 1.0), (7.0, 1.0), (0.0, 0.88), (0.0, 1.12))
 GAP_RATIO = 0.13          # blank columns wider than this split two characters
 MIN_GLYPH_RATIO = 0.06    # narrower runs of ink are specks, not characters
 
@@ -76,22 +83,29 @@ class GlyphReader:
             return [[] for _ in crops]
 
         size = glyph_preprocess.SIZE
-        tensor = np.stack([
-            np.frombuffer(glyph_preprocess.prepare(crop).tobytes(), dtype=np.uint8).reshape(size, size)
-            for crop in crops
-        ]).astype(np.float32)[:, None] / 255.0
+        prepared = [glyph_preprocess.prepare(crop) for crop in crops]
+        batch = []
+        for glyph in prepared:
+            for angle, scale in VIEWS:
+                batch.append(np.frombuffer(warp(glyph, angle, scale).tobytes(),
+                                           dtype=np.uint8).reshape(size, size))
+        tensor = np.stack(batch).astype(np.float32)[:, None] / 255.0
         logits = self._session.run(["logits"], {"glyph": tensor})[0]
 
         results = []
-        for row in logits:
-            scores: dict[str, float] = {}
-            for index, character in allowed:
-                scores[character] = max(scores.get(character, -math.inf), float(row[index]))
-            highest = max(scores.values())
-            weights = {character: math.exp(score - highest) for character, score in scores.items()}
-            total = sum(weights.values())
-            ranked = sorted(((character, weight / total) for character, weight in weights.items()),
-                            key=lambda item: -item[1])
+        for index in range(len(prepared)):
+            views = logits[index * len(VIEWS):(index + 1) * len(VIEWS)]
+            totals: dict[str, float] = {}
+            for row in views:
+                scores: dict[str, float] = {}
+                for label_index, character in allowed:
+                    scores[character] = max(scores.get(character, -math.inf), float(row[label_index]))
+                highest = max(scores.values())
+                weights = {character: math.exp(score - highest) for character, score in scores.items()}
+                total = sum(weights.values())
+                for character, weight in weights.items():
+                    totals[character] = totals.get(character, 0.0) + weight / total / len(views)
+            ranked = sorted(totals.items(), key=lambda item: -item[1])
             results.append(ranked[:top])
         return results
 
@@ -117,6 +131,26 @@ class GlyphReader:
         text = "".join(options[0][0] for options in ranked if options)
         score = min((options[0][1] for options in ranked if options), default=0.0)
         return [(text, score)]
+
+
+def warp(glyph: Image.Image, angle: float, scale: float) -> Image.Image:
+    """One augmented view of a normalized glyph, kept the same size."""
+    if angle == 0.0 and scale == 1.0:
+        return glyph
+    size = glyph.size[0]
+    view = glyph
+    if scale != 1.0:
+        side = max(8, round(size * scale))
+        resized = view.resize((side, side), Image.BILINEAR)
+        view = Image.new("L", (size, size), 0)
+        offset = (size - side) // 2
+        if side <= size:
+            view.paste(resized, (offset, offset))
+        else:
+            view = resized.crop((-offset, -offset, -offset + size, -offset + size))
+    if angle != 0.0:
+        view = view.rotate(angle, resample=Image.BILINEAR, fillcolor=0)
+    return view
 
 
 def segment(crop: Image.Image) -> list[Image.Image]:

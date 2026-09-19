@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gridlock Sprint</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PUZZLE DESK / GRIDLOCK SPRINT</p>
+        <h1>Gridlock <span>Sprint</span></h1>
+      </div>
+      <div class="clock" aria-label="session time">
+        <span>SESSION</span>
+        <strong id="timer">00:00.0</strong>
+      </div>
+    </header>
+
+    <nav class="mode-tabs" role="tablist" aria-label="mode">
+      <button id="tabSheets" class="mode-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="sheetsView">
+        Answer sheets <small>read a filled sheet and tally teams</small>
+      </button>
+      <button id="tabMake" class="mode-tab" type="button" role="tab" aria-selected="false" aria-controls="makeView">
+        Make puzzles <small>generate puzzles and print their sheets</small>
+      </button>
+    </nav>
+
+    <!-- ------------------------------------------------ answer sheet station -->
+    <section class="sheets" id="sheetsView" role="tabpanel">
+      <div class="sheets-main">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">ANSWER SHEET STATION</p>
+            <h2>Read a filled sheet</h2>
+          </div>
+          <div class="difficulty" id="scanStatusBadge">Ready</div>
+        </div>
+        <p class="notation">Each sheet carries its own puzzle in the printed QR square, so there is nothing to choose here — photograph any sheet from any packet.</p>
+
+        <div class="scan-grid">
+          <label id="sheetUploadBox" class="upload-box" for="sheetPhoto">
+            <input id="sheetPhoto" type="file" capture="environment"
+                   accept="image/*,image/heic,image/heif,.heic,.heif">
+            <span class="camera-mark">⌁</span>
+            <strong id="sheetUploadTitle">Photograph the whole sheet</strong>
+            <small id="sheetUploadNote">Include all four black corner squares and the QR square. Lay the page flat. iPhone HEIC photos are fine.</small>
+            <img id="sheetPreview" alt="Answer sheet preview">
+          </label>
+          <button id="sheetScanButton" class="scan-button" type="button" disabled>
+            Read this sheet <span>→</span>
+          </button>
+        </div>
+
+        <div id="sheetResult" class="result neutral" role="status">
+          <span class="result-icon">•</span>
+          <div><strong>Ready for a sheet</strong><p>The puzzle, its points and the answer key all come off the page itself.</p></div>
+        </div>
+
+        <div class="sheet-readout" id="sheetReadout" hidden>
+          <div class="sheet-identity">
+            <label>Team ID
+              <input id="sheetTeam" type="text" maxlength="12" spellcheck="false" placeholder="e.g. 7B">
+            </label>
+            <div class="read-field">
+              <span>PUZZLE</span>
+              <strong id="sheetCode">—</strong>
+            </div>
+            <div class="read-field">
+              <span>OPTIMAL</span>
+              <strong id="sheetOptimal">—</strong>
+            </div>
+            <div class="sheet-points"><span>WORTH</span><strong id="sheetPoints">—</strong></div>
+          </div>
+
+          <div class="transcript-heading">
+            <label for="sheetMoves">Moves read from the sheet</label>
+            <span id="sheetConfidence">—</span>
+          </div>
+          <textarea id="sheetMoves" spellcheck="false" placeholder="One move per line, e.g. BU1" aria-label="Moves read from the answer sheet"></textarea>
+          <ul class="sheet-warnings" id="sheetWarnings"></ul>
+          <p class="notation"><b>Check this against the paper before awarding points.</b> Rows the readers were unsure about are listed above.</p>
+
+          <div class="actions">
+            <button id="sheetGradeButton" class="primary-button" type="button">Grade &amp; award points <span>↵</span></button>
+            <button id="sheetSkipButton" class="secondary-button" type="button">Discard</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sheets-side">
+        <div class="score-strip">
+          <div><span>TEAMS</span><strong id="tallyTeams">0</strong></div>
+          <div><span>SHEETS</span><strong id="tallySheets">0</strong></div>
+          <div><span>POINTS</span><strong id="tallyPoints">0</strong></div>
+        </div>
+        <div class="tally-body">
+          <div class="panel-heading compact">
+            <div>
+              <p class="kicker">STANDINGS</p>
+              <h2>Team totals</h2>
+            </div>
+            <button id="exportButton" class="text-button" type="button">Export CSV</button>
+          </div>
+          <div id="tallyTable" class="tally-table"><p class="tally-empty">No sheets graded yet.</p></div>
+          <button id="resetTallyButton" class="secondary-button" type="button">Clear all scores</button>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ----------------------------------------------------- puzzle generator -->
+    <section class="sheets" id="makeView" role="tabpanel" hidden>
+      <div class="sheets-main">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">PUZZLE GENERATOR</p>
+            <h2>Make puzzles &amp; sheets</h2>
+          </div>
+          <div class="difficulty" id="makeBadge">Nothing yet</div>
+        </div>
+
+        <div class="make-grid make-grid-four">
+          <label>Easy <small>3–6 moves</small>
+            <input id="countEasy" type="number" min="0" max="20" value="4">
+          </label>
+          <label>Medium <small>7–12 moves</small>
+            <input id="countMedium" type="number" min="0" max="20" value="4">
+          </label>
+          <label>Hard <small>13–20 moves</small>
+            <input id="countHard" type="number" min="0" max="20" value="2">
+          </label>
+          <label>Grandmaster <small>21–40 moves</small>
+            <input id="countGrandmaster" type="number" min="0" max="20" value="1">
+          </label>
+        </div>
+        <div class="make-grid make-grid-four">
+          <label>Points <small>easy</small>
+            <input id="pointsEasy" type="number" min="0" max="99" value="2">
+          </label>
+          <label>Points <small>medium</small>
+            <input id="pointsMedium" type="number" min="0" max="99" value="4">
+          </label>
+          <label>Points <small>hard</small>
+            <input id="pointsHard" type="number" min="0" max="99" value="8">
+          </label>
+          <label>Points <small>grandmaster</small>
+            <input id="pointsGrandmaster" type="number" min="0" max="99" value="15">
+          </label>
+        </div>
+        <div class="make-grid make-grid-wide">
+          <label>Packet label <small>printed on every page</small>
+            <input id="packetLabel" type="text" maxlength="40" placeholder="GS-2026-R1">
+          </label>
+          <label>Seed <small>blank for a new set each time</small>
+            <input id="packetSeed" type="number" min="0" placeholder="random">
+          </label>
+        </div>
+
+        <button id="generateButton" class="generate-button" type="button">Generate puzzles <span>✦</span></button>
+
+        <div id="makeResult" class="result neutral" role="status">
+          <span class="result-icon">•</span>
+          <div><strong>Choose how many of each</strong><p>Puzzles are generated here in the browser, then laid out as printable sheets.</p></div>
+        </div>
+
+        <div id="makeOutput" hidden>
+          <div class="packet-files">
+            <button id="downloadSheets" class="file-link" type="button">
+              <strong>Student sheets</strong><small>one puzzle per page — print at 100% scale</small>
+            </button>
+            <button id="downloadKey" class="file-link is-private" type="button">
+              <strong>Answer key</strong><small>grader copy — do not hand out</small>
+            </button>
+          </div>
+          <div id="makeTable" class="tally-table"></div>
+        </div>
+      </div>
+
+      <aside class="sheets-side">
+        <div class="tally-body">
+          <div class="panel-heading compact">
+            <div>
+              <p class="kicker">HOW IT FITS TOGETHER</p>
+              <h2>One page, self-contained</h2>
+            </div>
+          </div>
+          <ol class="steps">
+            <li>Each sheet prints its puzzle into a <b>QR square</b>, along with the number of answer rows and what the puzzle is worth.</li>
+            <li>Nothing is stored here. A sheet can be graded on any machine running this app, in any order, months later.</li>
+            <li>The <b>Answer sheets</b> tab reads that square, solves the board itself to find the shortest route, then reads the handwriting and checks it.</li>
+            <li>Print at <b>100% scale</b>. The four corner squares are how a photo gets straightened, so they must stay on the page.</li>
+          </ol>
+        </div>
+      </aside>
+    </section>
+
+    <footer>
+      <span>GRIDLOCK SPRINT</span>
+      <span id="footerNote"></span>
+    </footer>
+  </main>
+
+  <script src="engine.js"></script>
+  <script src="search.js"></script>
+  <script src="puzzle_set.js"></script>
+  <script src="make.js"></script>
+  <script src="sheets.js"></script>
+</body>
+</html>

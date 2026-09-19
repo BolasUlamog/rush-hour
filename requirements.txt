@@ -1,0 +1,9 @@
+# Building packets and scanning answer sheets
+reportlab>=4.0        # draws the puzzle pages and the answer key
+pillow>=10.0          # rectifies photographed sheets and crops the answer cells
+onnxruntime>=1.18     # runs models/glyphs.onnx, the answer-cell character classifier
+numpy>=1.26           # tensor plumbing for onnxruntime
+pillow-heif>=0.16     # reads HEIC/HEIF photos straight off an iPhone
+
+# Development only: rasterizes PDFs for the fixtures used by scan.test.py
+pypdfium2>=4.0

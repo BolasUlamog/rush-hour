@@ -1,0 +1,6 @@
+# Development only: retraining models/glyphs.onnx from EMNIST.
+# The grading station itself needs only requirements.txt.
+torch>=2.4
+numpy>=1.26
+onnx>=1.16
+pillow>=10.0

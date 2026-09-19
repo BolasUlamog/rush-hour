@@ -1,0 +1,15 @@
+# Local environments (the training one is ~1 GB)
+.venv/
+.venv-train/
+__pycache__/
+*.pyc
+
+# Generated packets and scratch output
+output/
+tmp/
+
+# Keep models/glyphs.onnx — it is the shipped classifier and needed at runtime.
+# The PyTorch checkpoint is only for re-exporting, so it is not worth committing.
+models/*.pt
+
+.DS_Store

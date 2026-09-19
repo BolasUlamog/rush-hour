@@ -6,10 +6,13 @@ tmp/
 tests/
 models/glyphs.pt
 
-# Development-only tooling, not needed by the deployment
+# Local-only tooling. server.py is the macOS grading station: on Vercel the
+# api/ functions serve those routes, and leaving it here makes the Python
+# builder mistake it for the deployment's entrypoint.
+server.py
+Start Grading Station.command
 fill_sheet.py
 train_glyph_model.py
 *.test.py
 engine.test.js
 handwriting_ocr.swift
-Start Grading Station.command

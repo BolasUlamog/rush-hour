@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const engine = require("./engine.js");
+const engine = require("./public/engine.js");
 
 const board = [
   { id: "X", row: 2, col: 0, length: 2, orientation: "H" },
@@ -27,8 +27,8 @@ for (const level of ["easy", "medium", "hard"]) {
 // search.js is a second, much faster implementation of the same rules, used to
 // generate puzzles. If it ever disagrees with the referee, puzzles would ship
 // with wrong answer keys, so hold the two to the same answers.
-const search = require("./search.js");
-const sets = require("./puzzle_set.js");
+const search = require("./public/search.js");
+const sets = require("./public/puzzle_set.js");
 
 for (const level of ["easy", "medium", "hard"]) {
   for (let seed = 0; seed < 12; seed++) {

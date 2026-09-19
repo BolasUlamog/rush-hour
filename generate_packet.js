@@ -8,9 +8,9 @@
  * Usage: node generate_packet.js '<config json>'
  */
 
-const engine = require("./engine.js");
-const search = require("./search.js");
-const { buildPuzzleSet } = require("./puzzle_set.js");
+const engine = require("./public/engine.js");
+const search = require("./public/search.js");
+const { buildPuzzleSet } = require("./public/puzzle_set.js");
 
 function main() {
   let config;

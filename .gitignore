@@ -13,3 +13,5 @@ tmp/
 models/*.pt
 
 .DS_Store
+.vercel
+.env*

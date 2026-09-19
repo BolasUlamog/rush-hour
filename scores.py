@@ -65,6 +65,20 @@ FROM scores WHERE contest = ? ORDER BY team, puzzle
 """
 
 
+def open_store():
+    """The scoreboard this deployment should use.
+
+    A Google Sheet if one is configured, then Postgres, then a local SQLite
+    file. Whichever it is, the rest of the app only sees save/standings/clear.
+    """
+    import sheet_store
+
+    sheet = sheet_store.SheetStore()
+    if sheet.configured:
+        return sheet
+    return ScoreStore()
+
+
 class ScoreStore:
     """A tiny data layer over either Postgres or SQLite."""
 

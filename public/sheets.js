@@ -236,6 +236,27 @@
     movesInput.rows = Math.max(6, Math.min(24, lines + 1));
   }
 
+  /**
+   * A team already grading this round whose name is one character away.
+   *
+   * A team ID has no restricted alphabet, so B/D/R and 1/I are genuinely hard,
+   * and a misread ID awards a real team's points to a team that does not exist.
+   * The round's own standings are the best correction available, so a near miss
+   * is pointed out — but never applied silently, because two teams really can
+   * have names one letter apart.
+   */
+  function nearbyTeam(read) {
+    const known = ((standings && standings.teams) || []).map(row => row.team);
+    if (!read || known.includes(read)) return null;
+    const near = known.filter(name => {
+      if (name.length !== read.length) return false;
+      let differences = 0;
+      for (let i = 0; i < name.length; i++) if (name[i] !== read[i]) differences += 1;
+      return differences === 1;
+    });
+    return near.length === 1 ? near[0] : null;
+  }
+
   function showWarnings(warnings) {
     warningList.replaceChildren();
     warnings.forEach(text => {
@@ -300,7 +321,12 @@
       const clean = !data.warnings.length;
       confidenceBadge.className = clean ? "good" : "review";
       confidenceBadge.textContent = clean ? `${percent}% clear` : `${percent}% · review`;
-      showWarnings(data.warnings);
+      const suggestion = nearbyTeam(data.team);
+      showWarnings(suggestion
+        ? [`Team read as “${data.team}”, but “${suggestion}” is already grading this round. ` +
+           "Check the sheet before saving — one letter decides whose points these are.",
+           ...data.warnings]
+        : data.warnings);
       statusBadge.textContent = data.puzzleCode;
 
       const rowsRead = data.rows.filter(row => row.move).length;

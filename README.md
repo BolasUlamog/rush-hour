@@ -182,9 +182,29 @@ Where those scores go depends on what is configured:
 
 | setup | shared between volunteers? |
 | --- | --- |
+| `SHEET_WEBHOOK_URL` set to a Google Sheet | yes, and organisers can watch it live |
 | `DATABASE_URL` set to a Postgres URL | yes, wherever it runs |
 | one machine serving the room | yes — SQLite in `output/` |
 | deployed with no database | **no**, each instance keeps its own |
+
+### Scores in a Google Sheet
+
+Often the nicest option for a contest: the standings sit in a tab everyone can
+watch, a mistyped team can be fixed by hand, and the sheet is the record
+afterwards. There is no database to provision and no Google credentials in the
+app — an Apps Script bound to the spreadsheet does the writing, running as the
+sheet's owner.
+
+1. In the spreadsheet: **Extensions > Apps Script**, and paste
+   [`google_sheet/Code.gs`](google_sheet/Code.gs).
+2. Set `SHARED_TOKEN` in that script to a long random string.
+3. **Deploy > New deployment > Web app**, *Execute as* **Me**, *Who has access*
+   **Anyone**. Copy the deployment URL.
+4. Give the app `SHEET_WEBHOOK_URL` (that URL) and `SHEET_TOKEN` (the same
+   string). On Vercel those go in Settings > Environment Variables.
+
+"Anyone" means anyone holding the URL can post to it, which is what the token is
+for. Nothing else about the sheet is exposed.
 
 That last case is reported in the app rather than looking like a scoreboard:
 the panel says the scores are only on that device.

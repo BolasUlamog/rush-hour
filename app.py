@@ -20,7 +20,7 @@ import scores
 import sheet_builder
 
 MAX_REQUEST = 24 * 1024 * 1024
-STORE = scores.ScoreStore()
+STORE = scores.open_store()
 
 try:
     import glyph_reader

@@ -34,7 +34,7 @@ Two independent readers, which is the important design point:
 
 | reader | where | strength |
 | --- | --- | --- |
-| `glyph_reader.py` — small CNN on EMNIST | everywhere | reads each cell against only the characters that column can hold: 99% on L/R/U/D, 99.8% on digits 1-5, 94.8% on car labels |
+| `glyph_reader.py` — small CNN on EMNIST | everywhere | reads each cell against only the characters that column can hold: 99.7% on L/R/U/D, 99.9% on digits 1-5, 98.7% on car labels — and, because it is trained on dimmed glyphs, 99.1% / 99.5% / 96.6% on faint ones |
 | `text_reader.py` — Apple Vision | macOS only | whole words, e.g. `LEFT` |
 | `line_reader.py` — PP-OCR recognition | everywhere else | same role off a Mac, within one row of Apple's |
 
@@ -45,6 +45,15 @@ costs real accuracy (17/23 rows instead of 23/23 on the real photos), which is w
 the PP-OCR one exists.
 
 Measured on the two flat real photos: 23 of 23 rows, both team IDs right.
+
+The character model is trained on *faint* glyphs, and that is most of why it
+works. `glyph_preprocess.prepare()` fixes a black point off the cell's own
+histogram but never a white point, so light pencil reaches the model dim — it
+normalizes to a glyph peaking near 80/255 where every stock EMNIST glyph peaks at
+255. The same network trained without that augmentation scores 39.9% on a dimmed
+test set against 87.5% with it, and 54.8% against 96.6% on car labels. On clean
+glyphs the two are indistinguishable, which is exactly why the clean number was
+never the one to chase.
 
 ## Scoreboard
 
@@ -85,8 +94,8 @@ node engine.test.js              # puzzle rules; also holds search.js to the sam
 .venv/bin/python levels.test.py  # the two tier lists and the two dependency lists agree
 ```
 
-All passing as of handover. `scan.test.py`: puzzle identified 9/9, team ID 9/9,
-84 of 111 rows read automatically, 27 flagged, **0 wrong without a warning**.
+All passing. `scan.test.py`: puzzle identified 9/9, team ID 9/9,
+106 of 111 rows read automatically, 5 flagged, **0 wrong without a warning**.
 
 The three real photos in `tests/` are the valuable ones — synthetic renders are
 evenly lit and never caught the bugs the real photos did (a shadow making blank
@@ -94,22 +103,18 @@ cells read as ink; a dark bedspread merging a corner mark into the background).
 
 ## What's next, roughly in order
 
-1. **Retrain the character model.** Every residual error is the same handful of
-   confusions on faint strokes: `2↔1`, `J↔L↔F`, `B↔D`. The model is 89% on the
-   full 47-class problem and was trained for three minutes (`train_glyph_model.py`,
-   needs `requirements-train.txt` and EMNIST). More epochs, more capacity, and
-   augmentation aimed at faint low-contrast strokes would lift every platform at
-   once. This is the highest-value work left and replaces a lot of threshold
-   fiddling.
-2. **Connect the Google Sheet.** Paste `google_sheet/Code.gs` into the sheet's
+1. **Connect the Google Sheet.** Paste `google_sheet/Code.gs` into the sheet's
    Apps Script, set `SHARED_TOKEN`, deploy as a web app (Execute as *Me*, access
    *Anyone*), then set `SHEET_WEBHOOK_URL` and `SHEET_TOKEN` on Vercel. Until then
-   the deployed scoreboard is per-instance and says so. Damian's sheet is "rush
-   hour scoring" with TEAMS and SCORING tabs; the script writes to its own
-   `Scores` tab and leaves those alone.
-3. **Discord login for volunteers** — wanted so server roles decide who can grade.
+   the deployed scoreboard is per-instance and says so. Damian's sheet is
+   [rush hour scoring](https://docs.google.com/spreadsheets/d/1dz3JvHJVnyB9i_ex8BslAvjRy7Ozv4wJ2HvjZV_4j58/edit),
+   with TEAMS and SCORING tabs; the script writes to its own `Scores` tab and
+   leaves those alone. Sharing on the doc does not need to change: *Execute as Me*
+   means the script acts with Damian's own rights, and what is public is the
+   web-app URL, guarded by the token.
+2. **Discord login for volunteers** — wanted so server roles decide who can grade.
    Damian is checking with his tech team first; nothing implemented.
-4. Person IDs on sheets stay manual by decision. Teams can be mixed groups, so a
+3. Person IDs on sheets stay manual by decision. Teams can be mixed groups, so a
    team name does not imply a fixed set of people.
 
 ## Things already tried and rejected — don't redo them
@@ -128,11 +133,19 @@ cells read as ink; a dark bedspread merging a corner mark into the background).
 - **More cars to make puzzles harder.** Measured over thousands of boards, extra
   traffic makes puzzles *easier*: a crowded board has fewer legal moves. Difficulty
   comes from `search.js` walking the state graph and starting far from the exit.
+- **Modelling a skipping pencil as a rectangular cutout** in the training
+  augmentation. It removed a third of a glyph's width in one clean block, which
+  taught the model to invent whatever shape was missing: it then read a plain `1`
+  on `tests/real-sheet.jpg` as a `2` and was confident enough about it to override
+  Apple. A smooth low-frequency dimming field — thin irregular gaps, like real
+  pencil on grained paper — scores better on every EMNIST measure *and* leaves the
+  real photos correct.
 
 ## Known limitation worth remembering
 
 Agreement between the two readers is the confidence signal, so when both misread
 the same faint character nothing flags it. `tests/real-sheet-curled.jpg` is that
-case (row 7, a faint `2` read as `1` by both). The safety net is one level up: the
+case (row 7, a faint `2` read as `1` by both; retraining took that sheet from 18
+of 21 rows to 19, but not this row). The safety net is one level up: the
 route then fails validation naming the move, so the grader is pointed at it rather
 than a team being silently scored zero.

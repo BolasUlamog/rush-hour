@@ -122,8 +122,24 @@ Each written cell is then read twice, by two independent recognizers:
 - **`models/glyphs.onnx`** — a small CNN trained on EMNIST handwriting, run through
   onnxruntime. It reads each cell against only the characters that column can
   hold, which is where nearly all of its accuracy comes from. On EMNIST's own
-  test set: 89% across all 47 classes, but **99.0% on L/R/U/D**, **99.8% on the
-  digits 1-5**, and **94.8% on car labels**.
+  test set: 90% across all 47 classes, but **99.7% on L/R/U/D**, **99.9% on the
+  digits 1-5**, and **98.7% on car labels**.
+
+  It is also trained on *faint* glyphs, which is what the photographs actually
+  contain. `glyph_preprocess.prepare()` fixes a black point off the cell's own
+  histogram but never a white point, so lightly pencilled ink reaches the model
+  dim — light pencil on white paper normalizes to a glyph peaking near 80/255,
+  where every stock EMNIST glyph peaks at 255. Dimming, blurring, thinning and
+  breaking the training glyphs is therefore not generic regularization; it is the
+  distribution the grading station feeds it. Measured on a dimmed copy of the same
+  EMNIST test set, against the same network trained without it:
+
+  | on faintly pencilled glyphs | without | with |
+  | --- | --- | --- |
+  | all 47 classes | 39.9% | **87.5%** |
+  | direction (L/R/U/D) | 74.2% | **99.1%** |
+  | spaces (1-5) | 73.2% | **99.5%** |
+  | car label (X, A-N) | 54.8% | **96.6%** |
 - **A second reader, for an independent opinion.** Both are poor at a lone
   handwritten character, so cells are packed into compact text lines first.
   - On a Mac: **Apple's on-device text recognizer**.
@@ -252,8 +268,8 @@ referee — if the fast solver disagreed, puzzles would ship with wrong answer k
 — and checks that a generated set lands inside its difficulty band.
 
 Current result across all four tiers, including 19 to 25-move sheets with
-multi-block tables: puzzle identified 9/9, team ID 9/9, 93 of 111 rows read
-automatically, 18 flagged for review, 0 wrong without a warning.
+multi-block tables: puzzle identified 9/9, team ID 9/9, 106 of 111 rows read
+automatically, 5 flagged for review, 0 wrong without a warning.
 
 Long sheets have smaller cells, so more rows get flagged than on an easy sheet.
 A flagged row names the choice in front of the grader — "spaces read as 2, but
@@ -269,16 +285,25 @@ Only needed to change the alphabet or improve accuracy; the shipped
 `models/glyphs.onnx` is ready to use and the grading station never needs PyTorch.
 
 ```bash
-python3 -m venv .venv-train && .venv-train/bin/pip install -r requirements-train.txt
+python3.13 -m venv .venv-train && .venv-train/bin/pip install -r requirements-train.txt
 .venv-train/bin/python train_glyph_model.py --data /path/to/emnist
 ```
 
 `--data` is a folder of EMNIST's gzipped idx files, from
 [NIST](https://www.nist.gov/itl/products-and-services/emnist-dataset) (`gzip.zip`)
 or the per-file mirror at
-[aurelienduarte/emnist](https://github.com/aurelienduarte/emnist/tree/master/gzip).
-Training takes a few minutes and prints per-column accuracy. `--export-only`
-re-exports the saved checkpoint without training again.
+[aurelienduarte/emnist](https://github.com/aurelienduarte/emnist/tree/master/gzip)
+— on that mirror the `raw.githubusercontent.com` URLs serve git-lfs pointer files,
+so fetch from `media.githubusercontent.com/media/...` instead. Forty epochs takes
+about fifteen minutes on an M-series laptop. `--export-only` re-exports the saved
+checkpoint without training again.
+
+Every accuracy it prints is measured twice, once on the stock test set and once on
+a dimmed copy of it, because clean EMNIST accuracy says almost nothing about how a
+photographed sheet will read. Per-column accuracy folds lowercase onto the capital
+the way `glyph_reader` does when it reports a character: a capital `F` landing in
+EMNIST's separate `f` class is not an error the grading station can make, and
+counting it as one understates the car-label column by about four points.
 
 `glyph_preprocess.py` is shared by training and inference so a cell is normalized
 the same way in both; change it and you must retrain.

@@ -19,11 +19,12 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import tempfile
 import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
-LOCAL_FILE = Path(os.environ.get("GRIDLOCK_SCORES", Path(__file__).resolve().parent / "output" / "scores.sqlite3"))
+APP_DIR = Path(__file__).resolve().parent
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scores (
@@ -109,6 +110,20 @@ class ScoreStore:
 
     # -- connections ------------------------------------------------------- #
 
+    def local_file(self) -> Path:
+        """Where the SQLite file lives.
+
+        A serverless deployment can only write to the temporary directory, so it
+        goes there — per instance, which is exactly why `shared` reports False in
+        that case and the app tells the grader to expect it.
+        """
+        override = (os.environ.get("GRIDLOCK_SCORES") or "").strip()
+        if override:
+            return Path(override)
+        if self.serverless:
+            return Path(tempfile.gettempdir()) / "gridlock-scores.sqlite3"
+        return APP_DIR / "output" / "scores.sqlite3"
+
     def _connect(self):
         if self.postgres:
             import pg8000.dbapi
@@ -133,8 +148,9 @@ class ScoreStore:
                 ssl_context=ssl_context,
                 timeout=15,
             )
-        LOCAL_FILE.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(LOCAL_FILE, timeout=15)
+        path = self.local_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(path, timeout=15)
         connection.execute("PRAGMA journal_mode=WAL")      # concurrent readers
         return connection
 

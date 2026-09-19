@@ -124,9 +124,27 @@ Each written cell is then read twice, by two independent recognizers:
   hold, which is where nearly all of its accuracy comes from. On EMNIST's own
   test set: 89% across all 47 classes, but **99.0% on L/R/U/D**, **99.8% on the
   digits 1-5**, and **94.8% on car labels**.
-- **Apple's on-device text recognizer** — good at directions written out as words
-  (`LEFT`, `RIGHT`) and a useful second opinion. It is poor at lone handwritten
-  characters, so cells are packed into compact text lines before it sees them.
+- **A second reader, for an independent opinion.** Both are poor at a lone
+  handwritten character, so cells are packed into compact text lines first.
+  - On a Mac: **Apple's on-device text recognizer**.
+  - Everywhere else: **`models/ppocr_rec.onnx`**, PaddleOCR's PP-OCR recognition
+    model, run through the same onnxruntime. RapidOCR packages these models well
+    but depends on OpenCV, which is 119 MB installed — more than the room left
+    inside Vercel's 250 MB function limit. Its *detection* stage is what needs
+    OpenCV, and this app never needs detection: it composes the digest itself, so
+    it already knows where every line is. Only the recognition model is used, and
+    it carries its own character dictionary in its ONNX metadata.
+
+Measured on the two real photos in `tests/`, over 23 handwritten rows:
+
+| readers | rows right | team IDs | rows flagged |
+| --- | --- | --- | --- |
+| character model alone | 17/23 | both wrong | 27 |
+| + Apple recognizer | 23/23 | both right | 11 |
+| + PP-OCR recognizer | 22/23 | both right | 11 |
+
+So the deployed server reads within one row of a Mac. Losing the second reader
+entirely is what costs real accuracy, not which of the two it is.
 
 When the two agree the row passes quietly. When they disagree, the more confident
 reading is used and **the row is flagged for the grader** unless one reader is both
@@ -137,6 +155,21 @@ report a different move as if it were certain.
 Recognition is an assistant, not the judge: the grader confirms the text before
 any points are awarded. Nothing is uploaded — it all runs on the Mac. For student
 privacy, the sheets have no name field, only a team ID.
+
+## Deployment
+
+The app runs on Vercel as well as on a Mac: `app.py` is a single WSGI entrypoint
+serving `/api/health`, `/api/scan` and `/api/sheets`, and `public/` is the static
+site. `server.py` is the local station and is excluded from the deployment.
+
+Dependencies are declared in **both** `pyproject.toml` (which Vercel installs
+from) and `requirements.txt` (for local work); `levels.test.py` checks the two
+lists agree, because a deployment missing a package fails with a bare
+ModuleNotFoundError on the first request.
+
+The function bundle measures about 197 MB of Vercel's 250 MB limit, most of it
+onnxruntime, numpy and the two models. Expect roughly 10 s on a cold start and
+6 s warm, so `maxDuration` is set to 60 s.
 
 ## Testing
 
@@ -206,10 +239,14 @@ the same way in both; change it and you must retrain.
 | `image_input.py` | decodes uploads, HEIC included, and fixes EXIF rotation |
 | `sheet_scan.py` | photo to structured rows |
 | `glyph_reader.py` | runs the character model over answer cells |
+| `line_reader.py` | the cross-platform second reader (PP-OCR recognition) |
+| `text_reader.py` | the second reader on a Mac (Apple Vision), when available |
 | `glyph_preprocess.py` | normalizes a cell into an EMNIST-shaped glyph |
 | `train_glyph_model.py` | retrains and exports `models/glyphs.onnx` (dev only) |
 | `handwriting_ocr.swift` | Apple Vision wrapper: text regions and QR decoding |
-| `server.py` | serves the app, lays out sheets, scans photos |
+| `server.py` | the local macOS grading station |
+| `app.py` | the deployed API: one WSGI entrypoint for the same routes |
+| `sheet_builder.py` | turns a generated puzzle set into a printable PDF |
 | `make.js` | the generator page |
 | `sheets.js` | the answer-sheet station and team tally |
 | `fill_sheet.py` | test fixtures: fills a sheet and fakes a photo (dev only) |

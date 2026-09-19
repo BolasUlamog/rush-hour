@@ -30,6 +30,7 @@ import numpy as np
 from PIL import Image, ImageFilter
 
 import glyph_reader
+import line_reader as line_reader_module
 import sheet_code
 import sheet_layout as L
 import text_reader as text_reader_module
@@ -547,6 +548,55 @@ def read_digest(words: "text_reader_module.TextReader", digest: Image.Image,
     return {"slots": ranked(slots), "lines": ranked(lines)}
 
 
+def read_lines(reader: "line_reader_module.LineReader", digest: Image.Image,
+               slot_map: list[dict]) -> dict:
+    """Read each digest line as a whole with the PP-OCR recognizer.
+
+    The digest was composed here, so every line's position is already known and
+    no text detection is needed. A line whose character count matches the number
+    of cells it covers is split back across them, which is what lets a second
+    reader disagree with the character model cell by cell; anything else is kept
+    as a whole-row reading for `parse_line_move` to try.
+    """
+    slots: dict[tuple, dict[str, float]] = {}
+    lines: dict[tuple, dict[str, float]] = {}
+    grouped: dict[tuple, list[dict]] = {}
+    for slot in slot_map:
+        if slot.get("copy", 0):
+            continue                      # read the first copy of a line only
+        grouped.setdefault((slot["kind"], slot["row"]), []).append(slot)
+
+    for key, group in grouped.items():
+        if key[0] == "code":
+            continue
+        ordered = sorted(group, key=lambda item: item["x0"])
+        margin = 4
+        box = (max(0, min(item["x0"] for item in ordered) - margin),
+               max(0, min(item["y0"] for item in ordered) - margin),
+               min(digest.width, max(item["x1"] for item in ordered) + margin),
+               min(digest.height, max(item["y1"] for item in ordered) + margin))
+        if box[2] - box[0] < 8 or box[3] - box[1] < 8:
+            continue
+        text, confidence = reader.read(digest.crop(box))
+        text = clean(text)
+        if not text:
+            continue
+        if len(text) == len(ordered):
+            for slot, character in zip(ordered, text):
+                slots.setdefault((slot["kind"], slot["row"], slot["column"]), {})[character] = confidence
+        else:
+            lines.setdefault(key, {})[text] = confidence
+
+    def ranked(store):
+        return {
+            key: [{"text": text, "confidence": confidence, "source": "lines"}
+                  for text, confidence in sorted(texts.items(), key=lambda item: -item[1])]
+            for key, texts in store.items()
+        }
+
+    return {"slots": ranked(slots), "lines": ranked(lines)}
+
+
 def read_glyphs(reader: glyph_reader.GlyphReader, page: dict, cells: dict, car_ids: list[str]) -> dict:
     """Classify every written cell with the character model.
 
@@ -849,11 +899,13 @@ def read_sheet_code(page_image: Image.Image) -> tuple[dict, dict] | None:
 
 def scan_sheet(image: Image.Image, glyphs: glyph_reader.GlyphReader | None = None,
                text: "text_reader_module.TextReader | None" = None,
-               dpi: int = SCAN_DPI) -> dict:
+               dpi: int = SCAN_DPI,
+               lines: "line_reader_module.LineReader | None" = None) -> dict:
     """Read one photographed answer sheet using only what is printed on it."""
     image = image.convert("RGB")
     reader = glyphs if glyphs is not None else glyph_reader.GlyphReader()
     words = text if text is not None else text_reader_module.TextReader()
+    lines_reader = lines if lines is not None else line_reader_module.LineReader()
     marks = find_marks(image)
     validate_marks(marks)
 
@@ -884,14 +936,15 @@ def scan_sheet(image: Image.Image, glyphs: glyph_reader.GlyphReader | None = Non
         )
 
     puzzle, page_image, rotation = decoded
-    result = read_page(page_image, puzzle, dpi, reader, words)
+    result = read_page(page_image, puzzle, dpi, reader, words, lines_reader)
     result["rotation"] = rotation
     return result
 
 
 def read_page(page_image: Image.Image, puzzle: dict, dpi: int,
               reader: glyph_reader.GlyphReader,
-              words: "text_reader_module.TextReader") -> dict:
+              words: "text_reader_module.TextReader",
+              second: "line_reader_module.LineReader") -> dict:
     """Read the team ID and the answer rows off an already flattened page."""
     sheet = Sheet(page_image, dpi)
     # The sheet's own QR states how many answer rows it was printed with, so the
@@ -925,7 +978,16 @@ def read_page(page_image: Image.Image, puzzle: dict, dpi: int,
 
     slots: dict[tuple, list[dict]] = {key: list(value) for key, value in glyphs.items()}
     lines: dict[tuple, list[dict]] = {}
-    if (used_rows or cell_crops) and words.available:
+    if (used_rows or cell_crops) and not words.available and second.available:
+        # No Apple recognizer here, so PP-OCR reads each line instead.
+        single = compose_digest(sheet, page, used_rows, copies=1)
+        readings = read_lines(second, single[0], single[1])
+        lines = readings["lines"]
+        slots = {
+            key: [*glyphs.get(key, []), *readings["slots"].get(key, [])]
+            for key in set(glyphs) | set(readings["slots"])
+        }
+    elif (used_rows or cell_crops) and words.available:
         # Two passes: a compact line reads a full row best, while the same line
         # written out twice is what makes the recognizer notice a lone character.
         single = compose_digest(sheet, page, used_rows, copies=1)
@@ -1049,8 +1111,8 @@ def read_page(page_image: Image.Image, puzzle: dict, dpi: int,
         "confidence": round(min(scores), 3) if scores else 0.0,
         "warnings": warnings,
         "source": ("glyph model + Apple text recognizer" if reader.available and words.available
+                   else "glyph model + PP-OCR line reader" if reader.available and second.available
                    else "glyph model only" if reader.available
-                   else "Apple text recognizer only" if words.available
                    else "no reader available"),
     }
 

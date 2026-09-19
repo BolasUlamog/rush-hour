@@ -22,6 +22,7 @@ from PIL import Image
 
 import glyph_reader
 import image_input
+import line_reader
 import packet_pdf
 import sheet_layout
 import sheet_scan
@@ -219,6 +220,41 @@ def main() -> int:
     else:
         print("skip real photo, struck row: tests/real-sheet-struck.jpg is not present")
 
+    # The deployed server has no Apple recognizer, so the path it actually runs
+    # — character model plus the PP-OCR line reader — is checked here too.
+    deployed_ok = True
+    if real_photo.exists():
+        class NoAppleText:
+            available = False
+            reason = "checking the deployed path"
+
+            def read(self, *args, **kwargs):
+                return []
+
+        expected_route = ["AD1", "JR1", "CU1", "HL4", "FL3", "CD1", "JL1", "CD1", "AD2", "XR4"]
+        lines = line_reader.LineReader()
+        read = sheet_scan.scan_sheet(image_input.load_path(real_photo), glyph_model,
+                                     NoAppleText(), lines=lines)
+        correct = sum(1 for got, want in zip(read["moves"], expected_route) if got == want)
+        used = [row for row in read["rows"] if row["move"] and not row["struck"]]
+        silent = [row["row"] for row, want in zip(used, expected_route)
+                  if row["move"] != want and not row["needsReview"]]
+        deployed_ok = (
+            lines.available
+            and read["puzzleCode"] == "GS-M-001"
+            and read["team"] == "BANANA"
+            and correct >= 9          # the pair of readers manages 10 of 10
+            and not silent
+        )
+        print(f"{'ok ' if deployed_ok else 'FAIL'} deployed path (no Apple recognizer): "
+              f"team={read['team']!r} rows {correct}/{len(expected_route)} "
+              f"via {read['source']}")
+        if not deployed_ok:
+            failures.append(
+                f"deployed path: team={read['team']!r} correct={correct} silent_wrong={silent} "
+                f"line reader available={lines.available}"
+            )
+
     # An iPhone shoots HEIC by default, so that has to grade as-is.
     page, team, moves, style, words = UPSIDE_DOWN
     puzzle = manifest["puzzles"][page - 1]
@@ -273,7 +309,7 @@ def main() -> int:
             print(f"  - {failure}")
     passed = pages_right == total and teams_right == total and rows_silent_wrong == 0
     return 0 if (passed and upside_ok and cropped_ok and heic_ok and real_ok and struck_ok
-                 and not failures) else 1
+                 and deployed_ok and not failures) else 1
 
 
 if __name__ == "__main__":

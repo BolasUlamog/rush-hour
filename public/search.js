@@ -146,6 +146,80 @@
   }
 
   /**
+   * How much thinking a start position demands, on top of its move count.
+   *
+   * Move count alone does not tell a long forced shuffle apart from a puzzle with
+   * real decisions in it. Both take thirty moves; only one of them is interesting.
+   * So this walks every state lying on *some* shortest solution and asks, at each
+   * one, how many of the legal moves actually make progress:
+   *
+   *   cone      how many states lie on *some* shortest solution. This is the one
+   *             that matters. A wide cone means many different shortest routes,
+   *             so blundering forward tends to work; a narrow one means a single
+   *             corridor that has to be found. At a fixed 16 moves this ranges
+   *             over 21 to 688 across boards, so it separates them sharply.
+   *   retreats  states where a shortest continuation drives X *away* from the
+   *             exit. This is the move solvers refuse to look for, and what makes
+   *             a puzzle feel like it needs insight rather than patience.
+   *   forks     states offering five or more moves of which exactly one is right.
+   *   trapRate  share of legal moves that do not shorten the solution.
+   *
+   * Only `cone` and `retreats` drive selection. `forks` and `trapRate` are kept
+   * because they are what a solver actually feels, but neither can choose between
+   * boards: trapRate sits near 0.80 on everything, and raw fork counts correlate
+   * 0.87 with cone size, so maximizing forks would quietly select *wide* cones —
+   * easier puzzles — while looking like it was picking harder ones.
+   *
+   * There is no accepted difficulty formula for Rush Hour beyond move count, so
+   * these stay separate rather than blended into one number with invented weights.
+   */
+  function routeInsight(board, component, distance, startIndex, coneLimit = 20000) {
+    const { positions, index } = component;
+    if (distance[startIndex] < 1) return { trapRate: 0, forks: 0, retreats: 0, cone: 0 };
+
+    const seen = new Set([startIndex]);
+    const stack = [startIndex];
+    let legalSeen = 0;
+    let goodSeen = 0;
+    let forks = 0;
+    let retreats = 0;
+
+    while (stack.length) {
+      const at = stack.pop();
+      const here = distance[at];
+      if (here === 0) continue;
+      const pos = positions[at];
+      const onward = [];
+      let legal = 0;
+      let backward = 0;
+      eachMove(board, pos, (car, next) => {
+        legal += 1;
+        const candidate = Uint8Array.from(pos);
+        candidate[car] = next;
+        const to = index.get(keyOf(candidate));
+        if (to === undefined || distance[to] !== here - 1) return;
+        if (car === board.target && next < pos[car]) backward += 1;
+        onward.push(to);
+      });
+      legalSeen += legal;
+      goodSeen += onward.length;
+      if (onward.length === 1 && legal >= 5) forks += 1;
+      if (backward > 0) retreats += 1;
+      for (const to of onward) {
+        if (seen.has(to) || seen.size >= coneLimit) continue;
+        seen.add(to);
+        stack.push(to);
+      }
+    }
+    return {
+      trapRate: legalSeen ? (legalSeen - goodSeen) / legalSeen : 0,
+      forks,
+      retreats,
+      cone: seen.size
+    };
+  }
+
+  /**
    * Pick a starting position whose distance to the exit falls in [low, high].
    *
    * One exploration of a car set yields a position for every achievable move
@@ -154,7 +228,7 @@
    * distance this car set can offer at all.
    */
   function pickAtDistance(cars, low, high, random = Math.random, limit = DEFAULT_LIMIT,
-                          prefer = "spread") {
+                          prefer = "spread", sift = 0) {
     const board = makeBoard(cars);
     if (board.target < 0 || board.vertical[board.target]) return null;
     const component = explore(board, positionsOf(board, cars), limit);
@@ -182,12 +256,46 @@
       ? lengths[lengths.length - 1]
       : lengths[Math.floor(random() * lengths.length)];
     const bucket = byDistance.get(wanted);
-    const chosen = bucket[Math.floor(random() * bucket.length)];
+
+    // Every start in this bucket takes the same number of moves, so move count
+    // cannot separate them — but how much thought they demand varies enormously.
+    // Score a sample and keep the narrowest corridor, preferring one that forces
+    // X backward at some point.
+    let chosen = bucket[Math.floor(random() * bucket.length)];
+    let insight = null;
+    if (sift > 0 && bucket.length > 1) {
+      const pool = bucket.slice();
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      // A start that forces X backward always beats one that does not; between
+      // two of the same kind, the narrower corridor wins.
+      function beats(scored, incumbent) {
+        if (!incumbent) return true;
+        const forces = scored.retreats > 0;
+        const held = incumbent.scored.retreats > 0;
+        if (forces !== held) return forces;
+        return scored.cone < incumbent.scored.cone;
+      }
+
+      let best = null;
+      for (const candidate of pool.slice(0, sift)) {
+        const scored = routeInsight(board, component, distance, candidate);
+        if (beats(scored, best)) best = { candidate, scored };
+      }
+      if (best) {
+        chosen = best.candidate;
+        insight = best.scored;
+      }
+    }
+    if (!insight) insight = routeInsight(board, component, distance, chosen);
     return {
       cars: toCars(board, component.positions[chosen], cars),
       moves: distance[chosen],
       hardest,
-      stateCount: component.positions.length
+      stateCount: component.positions.length,
+      insight
     };
   }
 
@@ -264,6 +372,6 @@
     return route ? route.length : null;
   }
 
-  return { SIZE, makeBoard, positionsOf, explore, distancesToExit, pickAtDistance, hardestStart,
-           shortestRoute, shortestLength };
+  return { SIZE, makeBoard, positionsOf, explore, distancesToExit, routeInsight, pickAtDistance,
+           hardestStart, shortestRoute, shortestLength };
 });

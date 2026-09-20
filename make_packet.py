@@ -44,15 +44,14 @@ def generate_manifest(config: dict) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--easy", type=int, default=4, help="number of easy puzzles (3-6 moves)")
-    parser.add_argument("--medium", type=int, default=4, help="number of medium puzzles (7-12 moves)")
-    parser.add_argument("--hard", type=int, default=2, help="number of hard puzzles (13-20 moves)")
-    parser.add_argument("--grandmaster", type=int, default=1,
-                        help="number of grandmaster puzzles (21-40 moves)")
-    parser.add_argument("--points-easy", type=int, default=2)
-    parser.add_argument("--points-medium", type=int, default=4)
-    parser.add_argument("--points-hard", type=int, default=8)
-    parser.add_argument("--points-grandmaster", type=int, default=15)
+    parser.add_argument("--easy", type=int, default=4, help="number of easy puzzles (7-12 moves)")
+    parser.add_argument("--medium", type=int, default=4, help="number of medium puzzles (13-20 moves)")
+    parser.add_argument("--hard", type=int, default=2, help="number of hard puzzles (21-40 moves)")
+
+    parser.add_argument("--points-easy", type=int, default=4)
+    parser.add_argument("--points-medium", type=int, default=8)
+    parser.add_argument("--points-hard", type=int, default=15)
+
     parser.add_argument("--seed", type=int, default=None, help="repeat a previous packet exactly")
     parser.add_argument("--id", dest="packet_id", default=None, help="packet code printed on every page")
     parser.add_argument("--title", default="Middle School Math Meet")
@@ -62,7 +61,7 @@ def main() -> None:
                         help="open both PDFs when they are built, ready to print")
     args = parser.parse_args()
 
-    if args.easy + args.medium + args.hard + args.grandmaster <= 0:
+    if args.easy + args.medium + args.hard <= 0:
         raise SystemExit("Ask for at least one puzzle.")
 
     stamp = datetime.now()
@@ -78,18 +77,16 @@ def main() -> None:
             "easy": args.easy,
             "medium": args.medium,
             "hard": args.hard,
-            "grandmaster": args.grandmaster,
         },
         "points": {
             "easy": args.points_easy,
             "medium": args.points_medium,
             "hard": args.points_hard,
-            "grandmaster": args.points_grandmaster,
         },
     }
 
-    total = args.easy + args.medium + args.hard + args.grandmaster
-    print(f"Generating {total} puzzles… (grandmaster boards need a long search)")
+    total = args.easy + args.medium + args.hard
+    print(f"Generating {total} puzzles… (hard boards need a long search)")
     manifest = generate_manifest(config)
     manifest["createdAt"] = stamp.isoformat(timespec="seconds")
 

@@ -34,8 +34,8 @@ WORK = APP_DIR / "tmp" / "scan-test"
 MANIFEST = APP_DIR / "output" / "packets" / "GS-TEST" / "manifest.json"
 
 # page, team, moves (None = the answer key), handwriting style, direction words.
-# Pages 1-2 are easy, 3-4 medium, 5-6 hard (two answer blocks), 7-8 grandmaster
-# (two or three blocks), so every table layout is exercised.
+# Pages 1-3 are easy, 4-6 medium (two answer blocks), 7-8 hard (two or three
+# blocks), so every table layout is exercised.
 CASES = [
     (1, "7B", None, "bradley", False),
     (1, "12A", None, "comic", False),
@@ -56,8 +56,8 @@ MISSING_CORNER = (1, "7B", None, "bradley", False)
 def build_packet() -> dict:
     if not MANIFEST.exists():
         subprocess.run(
-            [sys.executable, str(APP_DIR / "make_packet.py"), "--easy", "2", "--medium", "2",
-             "--hard", "2", "--grandmaster", "2", "--seed", "4242", "--id", "GS-TEST"],
+            [sys.executable, str(APP_DIR / "make_packet.py"), "--easy", "3", "--medium", "3",
+             "--hard", "2", "--seed", "4242", "--id", "GS-TEST"],
             check=True, capture_output=True, cwd=str(APP_DIR),
         )
     manifest = json.loads(MANIFEST.read_text())

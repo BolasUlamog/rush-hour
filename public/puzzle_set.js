@@ -15,24 +15,30 @@
    * a crowded board has fewer legal moves. It comes from search.js: for a given
    * set of cars, walk the whole state graph and start the puzzle at a position
    * far from the exit. Roughly 2% of boards can support a 25-move-plus start,
-   * which is why the generator tries many boards for one grandmaster puzzle.
+   * which is why the generator tries many boards for one hard puzzle.
+   *
+   * Move count is the standard difficulty measure for Rush Hour — ThinkFun's own
+   * expert cards run 20 to 50 moves, and the hardest board there is takes 51 —
+   * but it does not separate a long forced shuffle from a puzzle with genuine
+   * decisions in it. So each tier also asks search.js how much *thought* a start
+   * demands (`routeInsight`) and keeps the best board it saw: the one whose
+   * shortest solution is a single narrow corridor rather than one of hundreds,
+   * and which forces the X car backwards away from the exit on the way.
    */
 
-  const LEVELS = ["easy", "medium", "hard", "grandmaster"];
-  const LEVEL_CODE = { easy: "E", medium: "M", hard: "H", grandmaster: "G" };
-  const LEVEL_NAMES = {
-    easy: "Easy", medium: "Medium", hard: "Hard", grandmaster: "Grandmaster"
-  };
-  // band: shortest-solution length; cars/trucks/vertical: what to place.
+  const LEVELS = ["easy", "medium", "hard"];
+  const LEVEL_CODE = { easy: "E", medium: "M", hard: "H" };
+  const LEVEL_NAMES = { easy: "Easy", medium: "Medium", hard: "Hard" };
+  // band: shortest-solution length; cars/trucks/vertical: what to place;
+  // sift: starts scored per board; pool: boards ranked per puzzle kept.
   const RECIPES = {
-    easy: { band: [3, 6], cars: 9, trucks: 0.25, vertical: 0.60, prefer: "spread" },
-    medium: { band: [7, 12], cars: 11, trucks: 0.30, vertical: 0.65, prefer: "spread" },
-    hard: { band: [13, 20], cars: 13, trucks: 0.30, vertical: 0.70, prefer: "hardest" },
-    grandmaster: { band: [21, 40], cars: 14, trucks: 0.30, vertical: 0.70, prefer: "hardest" }
+    easy: { band: [7, 12], cars: 11, trucks: 0.30, vertical: 0.65, prefer: "spread", sift: 24, pool: 3 },
+    medium: { band: [13, 20], cars: 13, trucks: 0.30, vertical: 0.70, prefer: "hardest", sift: 32, pool: 3 },
+    hard: { band: [21, 40], cars: 14, trucks: 0.30, vertical: 0.70, prefer: "hardest", sift: 32, pool: 2 }
   };
   const DEFAULTS = {
-    counts: { easy: 4, medium: 4, hard: 2, grandmaster: 1 },
-    points: { easy: 2, medium: 4, hard: 8, grandmaster: 15 },
+    counts: { easy: 4, medium: 4, hard: 2 },
+    points: { easy: 4, medium: 8, hard: 15 },
     title: "Middle School Math Meet",
     round: "Gridlock Sprint",
     stateLimit: 400000
@@ -120,7 +126,8 @@
     const cars = randomLayout(random, recipe);
     if (cars.length < Math.min(8, recipe.cars)) return null;
 
-    const found = search.pickAtDistance(cars, low, high, random, settings.stateLimit, recipe.prefer);
+    const found = search.pickAtDistance(cars, low, high, random, settings.stateLimit,
+                                        recipe.prefer, recipe.sift || 0);
     if (!found || !found.cars) return null;
 
     const key = signature(found.cars);
@@ -139,25 +146,68 @@
       solution: written,
       shortestMoves: found.moves,
       hardestPossible: found.hardest,
-      stateCount: found.stateCount
+      stateCount: found.stateCount,
+      insight: found.insight || null
     };
+  }
+
+  /**
+   * Is `puzzle` a more demanding board than `incumbent`, at the same tier?
+   *
+   * Cone size varies about thirtyfold between boards of identical move count, far
+   * more than anything available within a single board, so ranking whole boards is
+   * where most of the difficulty is won. A board forcing X backwards beats one
+   * that does not; between two of a kind, the narrower corridor wins.
+   *
+   * `byLength` guards against winning that and losing something bigger. On the
+   * tiers that maximize move count, ranking on cone alone will happily trade a
+   * 39-move board for a narrower 22-move one — measured, it dropped the hard tier
+   * from a mean of 24.1 moves to 22.4. Move count is the standard measure of a
+   * Rush Hour puzzle and it is what the tier's points promise, so there it leads
+   * and the insight metrics only break its ties. The "spread" tiers vary their
+   * length on purpose, so there they rank on insight alone.
+   */
+  function moreDemanding(puzzle, incumbent, byLength) {
+    if (!incumbent) return true;
+    if (!puzzle.insight || !incumbent.insight) return false;
+    if (byLength && puzzle.shortestMoves !== incumbent.shortestMoves) {
+      return puzzle.shortestMoves > incumbent.shortestMoves;
+    }
+    const forces = puzzle.insight.retreats > 0;
+    const held = incumbent.insight.retreats > 0;
+    if (forces !== held) return forces;
+    return puzzle.insight.cone < incumbent.insight.cone;
   }
 
   function buildLevel(engine, search, level, count, config, seen) {
     const settings = withDefaults(config);
+    const recipe = settings.recipes[level] || RECIPES[level];
     const random = createRandom((settings.seed + level.length * 7919) >>> 0);
     const chosen = [];
-    const limit = count * (level === "grandmaster" ? 4000 : 800);
+    const limit = count * (level === "hard" ? 4000 : 800);
+    // Oversample: keep generating past the first acceptable board and hold the
+    // most demanding of each group. The search budget is spent either way.
+    const pool = Math.max(1, recipe.pool || 1);
+    let best = null;
+    let inGroup = 0;
     for (let tries = 0; tries < limit && chosen.length < count; tries++) {
       const puzzle = attempt(engine, search, level, settings, seen, random);
-      if (puzzle) chosen.push(puzzle);
+      if (!puzzle) continue;
+      if (moreDemanding(puzzle, best, recipe.prefer === "hardest")) best = puzzle;
+      if (++inGroup >= pool) {
+        chosen.push(best);
+        best = null;
+        inGroup = 0;
+      }
     }
+    // Ran out of budget mid-group: a board in hand beats none.
+    if (best && chosen.length < count) chosen.push(best);
     return chosen;
   }
 
   function finalize(found, config) {
     const settings = withDefaults(config);
-    const order = { easy: 0, medium: 1, hard: 2, grandmaster: 3 };
+    const order = { easy: 0, medium: 1, hard: 2 };
     const sorted = [...found].sort((a, b) => order[a.level] - order[b.level]);
     const puzzles = sorted.map((puzzle, index) => ({
       index: index + 1,
@@ -198,6 +248,7 @@
 
   return {
     LEVELS, LEVEL_CODE, LEVEL_NAMES, RECIPES, DEFAULTS,
-    withDefaults, createRandom, signature, randomLayout, attempt, buildLevel, finalize, buildPuzzleSet
+    withDefaults, createRandom, signature, randomLayout, attempt, moreDemanding, buildLevel,
+    finalize, buildPuzzleSet
   };
 });

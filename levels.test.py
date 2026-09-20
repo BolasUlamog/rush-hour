@@ -2,8 +2,8 @@
 """Guard against two copies of the same fact drifting apart.
 
 The generator in puzzle_set.js defines the difficulty tiers; server.py validates
-against them and packet_pdf.py prints their names. When the grandmaster tier was
-added to the generator only, the server rejected every grandmaster puzzle as "an
+against them and packet_pdf.py prints their names. When a tier was once added to
+the generator only, the server rejected every puzzle at that tier as "an
 unknown level" and building a PDF failed. This test compares the two lists and
 then pushes one puzzle of each tier through the same path the browser uses.
 

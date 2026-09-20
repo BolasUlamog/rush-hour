@@ -23,7 +23,7 @@ GS1*GS-M-004*5*10*X202HA333VB422V…
 
 So the grading station never needs a packet list, a database, or a manifest. It
 decodes the square, **solves the board itself** to find the shortest route, reads
-the handwriting, and checks the student's moves against the rules. A grandmaster
+the handwriting, and checks the student's moves against the rules. A hard
 sheet needs forty-odd answer rows, so its table splits into two or three
 side-by-side blocks numbered in reading order; the scanner only walks the list of
 cells and never needs to know how a sheet was laid out. A sheet can be
@@ -47,12 +47,13 @@ server is asked only to lay the chosen boards out as PDF pages.
 
 | tier | shortest solution | points | answer blocks |
 | --- | --- | --- | --- |
-| Easy | 3-6 moves | 2 | 1 |
-| Medium | 7-12 moves | 4 | 1 |
-| Hard | 13-20 moves | 8 | 2 |
-| Grandmaster | 21-40 moves | 15 | 2-3 |
+| Easy | 7-12 moves | 4 | 1-2 |
+| Medium | 13-20 moves | 8 | 2 |
+| Hard | 21-40 moves | 15 | 2-3 |
 
-A move is one slide of one car, any distance — the convention Rush Hour uses.
+A move is one slide of one car, any distance — the convention Rush Hour uses, and
+the one its published move counts refer to. For scale, ThinkFun's own expert cards
+run 20 to 50 moves and the hardest board that exists takes 51.
 
 Difficulty does **not** come from adding more cars. Measured over thousands of
 boards, extra traffic makes puzzles *easier*, because a crowded board has fewer
@@ -63,8 +64,36 @@ Sampling random start positions — the obvious approach — tops out around 12
 moves; searching for far positions reaches 40.
 
 Only about 2% of boards support a 25-move-plus start, so the generator tries many
-boards for one grandmaster puzzle; expect a few seconds each. Set a seed to
-reproduce a set exactly.
+boards for one hard puzzle; expect a few seconds each. Set a seed to reproduce a
+set exactly. A full ten-page packet takes about fifteen seconds.
+
+#### Length is not the same as difficulty
+
+A thirty-move puzzle can still be a forced shuffle with nothing to work out. So
+each tier also ranks the boards it finds on how much *thought* they demand
+(`routeInsight` in `search.js`), using two measures taken over every state that
+lies on some shortest solution:
+
+- **Cone size** — how many states those are. A wide cone means many different
+  shortest routes, so blundering forward tends to work; a narrow one means a
+  single corridor that has to be found. At a fixed 16 moves this ranges from 21
+  to 688 across boards, so it separates them sharply.
+- **Retreats** — whether a shortest solution ever drives the red car *away* from
+  the exit. This is the move solvers refuse to look for, and the thing that makes
+  a puzzle feel like it needs insight rather than patience.
+
+Two measures that look useful are deliberately **not** used. `trapRate` — the
+share of legal moves that do not shorten the solution — sits near 0.80 on
+essentially every board, so it cannot choose between them. Raw fork counts
+correlate 0.87 with cone size, so maximizing forks would quietly select *wide*
+cones, i.e. easier puzzles, while appearing to pick harder ones.
+
+Move count still leads on the tiers that maximize it, because it is the standard
+measure and it is what the tier's points promise; ranking on cone alone was
+measured trading a 39-move board for a narrower 22-move one. Ranking this way
+raised the hard tier from a mean of 24.1 moves to 28.6, and took the share of
+puzzles that force the red car backwards from 94% to 100% (easy: 56% to 100%,
+with its solution cone halved).
 
 
 **Print at 100% scale** — no "shrink to fit". The four black corner squares are
@@ -74,7 +103,7 @@ There is also a command-line path, which writes the same sheets to disk:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python make_packet.py --easy 4 --medium 4 --hard 2 --grandmaster 1 \
+.venv/bin/python make_packet.py --easy 4 --medium 4 --hard 2 \
     --id GS-2026-R1 --open
 ```
 

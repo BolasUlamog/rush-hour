@@ -55,6 +55,20 @@ test set against 87.5% with it, and 54.8% against 96.6% on car labels. On clean
 glyphs the two are indistinguishable, which is exactly why the clean number was
 never the one to chase.
 
+## Difficulty
+
+Three tiers, `easy` 7-12 moves / `medium` 13-20 / `hard` 21-40, worth 4 / 8 / 15
+points. There used to be a 3-6 move `easy` tier below these and a `grandmaster`
+above; on 2026-09-20 the bottom one was dropped and the rest shifted down a name,
+because the whole packet needed to be harder.
+
+Length alone does not make a puzzle interesting, so each tier also ranks the
+boards it finds by how much thought they demand — see `routeInsight` in
+`search.js` and the README's "Length is not the same as difficulty". Two things
+to know before touching it: raw fork counts are a trap (they select *easier*
+boards), and move count must stay ahead of the insight metrics on the tiers that
+maximize it. Both are in the rejected list below with the numbers.
+
 ## Scoreboard
 
 `scores.open_store()` picks, in order: Google Sheet → Postgres → SQLite. All three
@@ -102,7 +116,7 @@ never applied when ambiguous.
   `maxDuration` 60 s.
 - Difficulty tiers exist in `public/puzzle_set.js` **and** `levels.py`;
   `levels.test.py` checks those agree too. A stale copy of that list once made the
-  server reject every grandmaster puzzle.
+  server reject every puzzle at the top tier.
 
 ## Tests
 
@@ -150,6 +164,16 @@ cells read as ink; a dark bedspread merging a corner mark into the background).
 - **More cars to make puzzles harder.** Measured over thousands of boards, extra
   traffic makes puzzles *easier*: a crowded board has fewer legal moves. Difficulty
   comes from `search.js` walking the state graph and starting far from the exit.
+- **Ranking boards by how many "forks" their solution has** (states where one move
+  of many is right). Fork counts correlate 0.87 with the size of the solution
+  cone, so this selects *wide* cones — puzzles with many shortest routes, which
+  are easier — while looking like it picks harder ones. Rank on cone size instead,
+  which is the thing forks were standing in for. `trapRate` is likewise useless
+  for choosing: it sits near 0.80 on every board.
+- **Ranking boards on solution-cone size alone.** On the tiers that maximize move
+  count it trades length for narrowness — measured, it dropped the hard tier from
+  a mean of 24.1 moves to 22.4 and threw away a 39-move board for a 22-move one.
+  Move count leads there; the insight metrics only break its ties.
 - **Modelling a skipping pencil as a rectangular cutout** in the training
   augmentation. It removed a third of a glyph's width in one clean block, which
   taught the model to invent whatever shape was missing: it then read a plain `1`

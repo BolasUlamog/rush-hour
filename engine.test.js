@@ -46,9 +46,9 @@ for (const level of ["easy", "medium", "hard"]) {
 // A generated set must hit its band, and every puzzle's stated key must solve it.
 const built = sets.buildPuzzleSet(engine, search, {
   seed: 20260918,
-  counts: { easy: 1, medium: 1, hard: 1, grandmaster: 1 }
+  counts: { easy: 1, medium: 1, hard: 1 }
 });
-assert.equal(built.puzzles.length, 4, "every level should yield a puzzle");
+assert.equal(built.puzzles.length, 3, "every level should yield a puzzle");
 for (const puzzle of built.puzzles) {
   const [low, high] = sets.RECIPES[puzzle.level].band;
   assert.ok(
@@ -61,8 +61,36 @@ for (const puzzle of built.puzzles) {
   for (const car of puzzle.cars) assert.match(car.id, /^[A-Z0-9]$/);
 }
 assert.ok(
-  built.puzzles.find(p => p.level === "grandmaster").shortestMoves >= 21,
-  "a grandmaster puzzle should need at least 21 moves"
+  built.puzzles.find(p => p.level === "hard").shortestMoves >= 21,
+  "a hard puzzle should need at least 21 moves"
 );
+
+// Difficulty is not only length. Selection is supposed to prefer a start whose
+// shortest solution is a narrow corridor, and one that makes the X car reverse
+// away from the exit — the move solvers do not think to look for. Measured on the
+// same boards, sifting must not quietly hand back a wider cone than doing nothing.
+{
+  const recipe = sets.RECIPES.medium;
+  const random = sets.createRandom(4242);
+  let compared = 0;
+  let siftedNarrower = 0;
+  let forcesRetreat = 0;
+  for (let tries = 0; tries < 400 && compared < 20; tries++) {
+    const cars = sets.randomLayout(random, recipe);
+    const [low, high] = recipe.band;
+    const plain = search.pickAtDistance(cars, low, high, sets.createRandom(tries), 400000, "hardest", 0);
+    const sifted = search.pickAtDistance(cars, low, high, sets.createRandom(tries), 400000, "hardest", recipe.sift);
+    if (!plain || !plain.cars || !sifted || !sifted.cars) continue;
+    assert.equal(plain.moves, sifted.moves, "sifting must not change the move count");
+    compared += 1;
+    if (sifted.insight.cone <= plain.insight.cone) siftedNarrower += 1;
+    if (sifted.insight.retreats > 0) forcesRetreat += 1;
+  }
+  assert.ok(compared >= 10, `only ${compared} boards were comparable`);
+  assert.equal(siftedNarrower, compared,
+    `sifting widened the solution cone on ${compared - siftedNarrower} of ${compared} boards`);
+  assert.ok(forcesRetreat / compared >= 0.5,
+    `only ${forcesRetreat} of ${compared} sifted starts force the X car backwards`);
+}
 
 console.log("All Gridlock Sprint engine tests passed.");

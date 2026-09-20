@@ -251,7 +251,7 @@
     }
   }
 
-  /** Grow the move box to the answer: a grandmaster sheet can hold 40 rows. */
+  /** Grow the move box to the answer: a hard sheet can hold 40 rows. */
   function fitMoves() {
     const lines = movesInput.value.split("\n").length;
     movesInput.rows = Math.max(6, Math.min(24, lines + 1));

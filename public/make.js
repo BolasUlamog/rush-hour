@@ -15,14 +15,12 @@
   const controls = {
     easy: document.getElementById("countEasy"),
     medium: document.getElementById("countMedium"),
-    hard: document.getElementById("countHard"),
-    grandmaster: document.getElementById("countGrandmaster")
+    hard: document.getElementById("countHard")
   };
   const points = {
     easy: document.getElementById("pointsEasy"),
     medium: document.getElementById("pointsMedium"),
-    hard: document.getElementById("pointsHard"),
-    grandmaster: document.getElementById("pointsGrandmaster")
+    hard: document.getElementById("pointsHard")
   };
   const packetLabel = document.getElementById("packetLabel");
   const packetSeed = document.getElementById("packetSeed");
@@ -63,14 +61,12 @@
       counts: {
         easy: readNumber(controls.easy, 0),
         medium: readNumber(controls.medium, 0),
-        hard: readNumber(controls.hard, 0),
-        grandmaster: readNumber(controls.grandmaster, 0)
+        hard: readNumber(controls.hard, 0)
       },
       points: {
-        easy: readNumber(points.easy, 2),
-        medium: readNumber(points.medium, 4),
-        hard: readNumber(points.hard, 8),
-        grandmaster: readNumber(points.grandmaster, 15)
+        easy: readNumber(points.easy, 4),
+        medium: readNumber(points.medium, 8),
+        hard: readNumber(points.hard, 15)
       },
       packetId: (packetLabel.value || "").trim().toUpperCase(),
       seed: Number.isFinite(seed) ? seed : undefined
@@ -118,22 +114,37 @@
       for (const level of sets.LEVELS) {
         const count = Number(settings.counts[level] || 0);
         if (count <= 0) continue;
+        const recipe = settings.recipes[level] || sets.RECIPES[level];
         const random = sets.createRandom((settings.seed + level.length * 7919) >>> 0);
-        const limit = count * (level === "grandmaster" ? 4000 : 800);
+        const limit = count * (level === "hard" ? 4000 : 800);
+        // Mirrors sets.buildLevel, unrolled only so the page can be handed back
+        // to the browser between attempts. Keep the two in step.
+        const pool = Math.max(1, recipe.pool || 1);
+        let best = null;
+        let inGroup = 0;
         let made = 0;
         for (let tries = 0; tries < limit && made < count; tries++) {
           const puzzle = sets.attempt(engine, search, level, settings, seen, random);
           if (puzzle) {
-            found.push(puzzle);
-            made += 1;
+            if (sets.moreDemanding(puzzle, best, recipe.prefer === "hardest")) best = puzzle;
+            if (++inGroup >= pool) {
+              found.push(best);
+              best = null;
+              inGroup = 0;
+              made += 1;
+            }
           }
-          // Hand the page back to the browser regularly: a grandmaster board can
-          // take a couple of seconds of searching to turn up.
+          // Hand the page back to the browser regularly: a hard board can take a
+          // couple of seconds of searching to turn up.
           if (tries % 25 === 0) {
             setResult("partial", "Generating",
               `${found.length} of ${wanted} found — searching ${sets.LEVEL_NAMES[level].toLowerCase()} boards.`);
             await new Promise(resolve => setTimeout(resolve, 0));
           }
+        }
+        if (best && made < count) {
+          found.push(best);
+          made += 1;
         }
         if (made < count) shortfalls.push(`${level}: found ${made} of ${count}`);
       }

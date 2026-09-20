@@ -43,15 +43,22 @@
         <div class="scan-grid">
           <label id="sheetUploadBox" class="upload-box" for="sheetPhoto">
             <input id="sheetPhoto" type="file" capture="environment"
-                   accept="image/*,image/heic,image/heif,.heic,.heif">
+                   accept="image/*,image/heic,image/heif,.heic,.heif,application/pdf,.pdf">
             <span class="camera-mark">⌁</span>
             <strong id="sheetUploadTitle">Photograph the whole sheet</strong>
-            <small id="sheetUploadNote">Include all four black corner squares and the QR square. Lay the page flat. iPhone HEIC photos are fine.</small>
+            <small id="sheetUploadNote">Include all four black corner squares and the QR square. Lay the page flat. iPhone HEIC photos are fine, and so is a PDF straight off a copier — a whole stack in one file.</small>
             <img id="sheetPreview" alt="Answer sheet preview">
           </label>
-          <button id="sheetScanButton" class="scan-button" type="button" disabled>
-            Read this sheet <span>→</span>
-          </button>
+          <div class="scan-actions">
+            <button id="sheetScanButton" class="scan-button" type="button" disabled>
+              Read this sheet <span>→</span>
+            </button>
+            <div id="stackBar" class="stack-bar" hidden>
+              <button id="stackPrev" class="stack-step" type="button">‹</button>
+              <span id="stackLabel">Sheet 1 of 1</span>
+              <button id="stackNext" class="stack-step" type="button">›</button>
+            </div>
+          </div>
         </div>
 
         <div id="sheetResult" class="result neutral" role="status">

@@ -58,8 +58,8 @@ def check_dependencies() -> list[str]:
         return ["pyproject.toml declares no dependencies, so Vercel will install nothing"]
 
     deployed = requirement_names(block.group(1))
-    # requirements.txt also carries development-only extras.
-    development = {"pypdfium2"}
+    # requirements.txt may carry development-only extras; there are none today.
+    development = set()
     local = requirement_names(requirements) - development
 
     problems = []

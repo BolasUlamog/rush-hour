@@ -15,6 +15,7 @@ dependencies = [
     "numpy>=1.26",
     "zxing-cpp>=2.2",
     "pg8000>=1.30",
+    "pypdfium2>=4.0",
 ]
 
 [tool.vercel]

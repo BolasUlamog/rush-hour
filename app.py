@@ -58,10 +58,26 @@ def health() -> dict:
 
 
 def scan(payload: dict) -> dict:
+    """Read one sheet out of an upload.
+
+    An upload may be a photograph or a PDF, and a PDF may hold a whole stack off
+    a copier, so the caller says which page it wants and is told how many there
+    are. Reading every page in one request is not an option: a sheet takes several
+    seconds and the function's ceiling is sixty.
+    """
     if sheet_scan is None:
         raise RuntimeError(SCAN_ERROR)
-    photo = image_input.load_data_url(payload.get("image", ""))
-    return sheet_scan.scan_sheet(photo, GLYPHS, WORDS)
+    pages = image_input.load_data_url_pages(payload.get("image", ""))
+    try:
+        wanted = int(payload.get("page") or 0)
+    except (TypeError, ValueError):
+        raise ValueError("That page number is not a number.") from None
+    if not 0 <= wanted < len(pages):
+        raise ValueError(f"That upload has {len(pages)} page(s); page {wanted + 1} is not one of them.")
+    result = sheet_scan.scan_sheet(pages[wanted], GLYPHS, WORDS)
+    result["page"] = wanted
+    result["pages"] = len(pages)
+    return result
 
 
 def contest_name(value: object) -> str:

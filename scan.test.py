@@ -318,6 +318,54 @@ def main() -> int:
         failures.append(f"heic: {error}")
         print(f"FAIL heic photo: {error}")
 
+    # A stack run through a copier arrives as one multi-page PDF, not as photos.
+    # Every page has to come back separately and in order, and page numbering has
+    # to be bounds-checked: a request for a page that is not there must say so
+    # rather than reach into the list and fail somewhere confusing.
+    stack_ok = True
+    try:
+        import pypdfium2 as pdfium
+
+        wanted = [(1, "BANANA"), (5, "CARROT"), (8, "TOMATO")]
+        stack = pdfium.PdfDocument.new()
+        for index, (page, team) in enumerate(wanted, 1):
+            puzzle = manifest["puzzles"][page - 1]
+            one = WORK / f"stack{index}.pdf"
+            fill_sheet.fill_page(manifest, puzzle, team, list(puzzle["solution"]), "bradley",
+                                 seed=index * 23, words=False, out_pdf=one)
+            stack.import_pages(pdfium.PdfDocument(str(one)))
+        stack_path = WORK / "stack.pdf"
+        stack.save(str(stack_path))
+
+        pages = image_input.load_path_pages(stack_path)
+        stack_ok = len(pages) == len(wanted)
+        read_back = []
+        for image, (page, team) in zip(pages, wanted):
+            puzzle = manifest["puzzles"][page - 1]
+            read = sheet_scan.scan_sheet(image, glyph_model, apple_text)
+            read_back.append(read["puzzleCode"])
+            if not (read["puzzleCode"] == puzzle["code"] and read["team"] == team
+                    and read["moves"] == list(puzzle["solution"])):
+                stack_ok = False
+                failures.append(f"pdf stack page {page}: code={read['puzzleCode']} "
+                                f"team={read['team']!r} moves={read['moves']}")
+        # A single-page PDF still has to behave like one sheet.
+        if len(image_input.load_path_pages(WORK / "stack1.pdf")) != 1:
+            stack_ok = False
+            failures.append("pdf stack: a one-page PDF did not come back as one page")
+        # And a photo must not be mistaken for a PDF.
+        if image_input.is_pdf((APP_DIR / "tests" / "real-sheet.jpg").read_bytes()):
+            stack_ok = False
+            failures.append("pdf stack: a jpeg was taken for a PDF")
+        print(f"{'ok ' if stack_ok else 'FAIL'} pdf stack: {len(pages)} pages read "
+              f"in order {read_back}")
+    except ImportError:
+        print("skip pdf stack: pypdfium2 is not installed")
+    except Exception as error:
+        stack_ok = False
+        failures.append(f"pdf stack: {error}")
+        print(f"FAIL pdf stack: {error}")
+
     # A photo missing a corner mark must fail with advice, not a traceback.
     page, team, moves, style, words = MISSING_CORNER
     puzzle = manifest["puzzles"][page - 1]
@@ -347,7 +395,7 @@ def main() -> int:
             print(f"  - {failure}")
     passed = pages_right == total and teams_right == total and rows_silent_wrong == 0
     return 0 if (passed and upside_ok and cropped_ok and heic_ok and real_ok and struck_ok
-                 and curled_ok and deployed_ok and not failures) else 1
+                 and curled_ok and deployed_ok and stack_ok and not failures) else 1
 
 
 if __name__ == "__main__":

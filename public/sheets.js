@@ -30,6 +30,10 @@
   const uploadDefaults = { title: uploadTitle.textContent, note: uploadNote.textContent };
   const uploadBox = document.getElementById("sheetUploadBox");
   const scanButton = document.getElementById("sheetScanButton");
+  const stackBar = document.getElementById("stackBar");
+  const stackLabel = document.getElementById("stackLabel");
+  const stackPrev = document.getElementById("stackPrev");
+  const stackNext = document.getElementById("stackNext");
   const statusBadge = document.getElementById("scanStatusBadge");
   const resultBox = document.getElementById("sheetResult");
   const readout = document.getElementById("sheetReadout");
@@ -50,6 +54,12 @@
   const scoreboardNote = document.getElementById("scoreboardNote");
 
   let sheetImage = null;
+  // A PDF off a copier holds a whole pile of sheets. Each still has to be checked
+  // against the paper by a person, so the pile is walked one sheet at a time
+  // rather than read in one go — which also keeps any single request well inside
+  // the function's sixty-second ceiling.
+  let sheetPage = 0;
+  let sheetPages = 1;
   let current = null;      // the puzzle decoded from the sheet being graded
   let tally = {};          // the local fallback, when no database is configured
   let standings = null;    // what the server last told us
@@ -243,12 +253,22 @@
    */
   async function prepareSheet(file) {
     const raw = await readFile(file);
+    // A PDF must go up whole: the server renders it, and shrinking it through a
+    // canvas would only turn it into a broken image.
+    if (/^data:application\/pdf[;,]/i.test(raw)) return { image: raw, preview: null, pdf: true };
     try {
       const jpeg = await shrinkToJpeg(raw);
       return { image: jpeg, preview: jpeg };
     } catch (error) {
       return { image: raw, preview: null };
     }
+  }
+
+  function showStack() {
+    stackBar.hidden = sheetPages <= 1;
+    stackLabel.textContent = `Sheet ${sheetPage + 1} of ${sheetPages}`;
+    stackPrev.disabled = sheetPage <= 0;
+    stackNext.disabled = sheetPage >= sheetPages - 1;
   }
 
   /** Grow the move box to the answer: a hard sheet can hold 40 rows. */
@@ -327,7 +347,16 @@
     try {
       const prepared = await prepareSheet(file);
       sheetImage = prepared.image;
-      if (prepared.preview) {
+      sheetPage = 0;
+      sheetPages = 1;
+      showStack();
+      if (prepared.pdf) {
+        photoPreview.removeAttribute("src");
+        uploadBox.classList.remove("has-photo");
+        uploadTitle.textContent = file.name || "PDF ready";
+        uploadNote.textContent = "A PDF is read on the server. If it holds a stack, "
+          + "you will be stepped through it one sheet at a time.";
+      } else if (prepared.preview) {
         photoPreview.src = prepared.preview;
         uploadBox.classList.add("has-photo");
         uploadTitle.textContent = uploadDefaults.title;
@@ -345,7 +374,7 @@
     }
   });
 
-  scanButton.addEventListener("click", async () => {
+  async function readSheet() {
     if (!sheetImage) return;
     scanButton.disabled = true;
     scanButton.firstChild.textContent = "Reading the sheet… ";
@@ -354,10 +383,13 @@
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: sheetImage })
+        body: JSON.stringify({ image: sheetImage, page: sheetPage })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "The sheet could not be read.");
+      sheetPages = Number(data.pages) || 1;
+      sheetPage = Number.isFinite(Number(data.page)) ? Number(data.page) : sheetPage;
+      showStack();
 
       // The board came off the paper; work out the shortest route here.
       const optimal = engine.solve(data.cars);
@@ -396,7 +428,20 @@
       scanButton.disabled = false;
       scanButton.firstChild.textContent = "Read this sheet ";
     }
-  });
+  }
+
+  scanButton.addEventListener("click", readSheet);
+
+  function stepStack(by) {
+    const wanted = sheetPage + by;
+    if (!sheetImage || wanted < 0 || wanted >= sheetPages) return;
+    sheetPage = wanted;
+    showStack();
+    readSheet();
+  }
+
+  stackPrev.addEventListener("click", () => stepStack(-1));
+  stackNext.addEventListener("click", () => stepStack(1));
 
   gradeButton.addEventListener("click", async () => {
     if (readout.hidden || !current) return;
@@ -455,17 +500,25 @@
         `The scoreboard could not be reached (${error.message}), so this score is local. Export the CSV before closing.`);
     }
     clearSheet(false);
+    nextInStack();
   });
 
   function clearSheet(resetResult) {
-    sheetImage = null;
+    // Mid-stack, the upload stays put: the next sheet is already in it.
+    const more = sheetPages > 1 && sheetPage < sheetPages - 1;
+    if (!more) {
+      sheetImage = null;
+      photoInput.value = "";
+      sheetPage = 0;
+      sheetPages = 1;
+      showStack();
+    }
     current = null;
-    photoInput.value = "";
     photoPreview.removeAttribute("src");
     uploadBox.classList.remove("has-photo");
     uploadTitle.textContent = uploadDefaults.title;
     uploadNote.textContent = uploadDefaults.note;
-    scanButton.disabled = true;
+    scanButton.disabled = !more;
     readout.hidden = true;
     movesInput.value = "";
     movesInput.rows = 6;
@@ -473,13 +526,29 @@
     showWarnings([]);
     confidenceBadge.className = "";
     confidenceBadge.textContent = "—";
+    if (more) {
+      uploadTitle.textContent = `Sheet ${sheetPage + 2} of ${sheetPages} is next`;
+      uploadNote.textContent = "Still working through the uploaded PDF.";
+    }
     if (resetResult) {
       statusBadge.textContent = "Ready";
       setResult("neutral", "Ready for the next sheet", "Photograph the whole page, corner squares included.");
     }
   }
 
-  skipButton.addEventListener("click", () => clearSheet(true));
+  /** After grading one sheet of a stack, bring the next one up automatically. */
+  function nextInStack() {
+    if (sheetImage && sheetPages > 1 && sheetPage < sheetPages - 1) stepStack(1);
+  }
+
+  skipButton.addEventListener("click", () => {
+    if (sheetImage && sheetPages > 1 && sheetPage < sheetPages - 1) {
+      clearSheet(false);
+      nextInStack();
+      return;
+    }
+    clearSheet(true);
+  });
 
   exportButton.addEventListener("click", () => {
     const data = standings || localStandings();

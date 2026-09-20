@@ -122,24 +122,39 @@ class GradingHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(pdf)
                 return
 
-            self.send_json(200, scan_answer_sheet(data.get("image", "")))
+            self.send_json(200, scan_answer_sheet(data.get("image", ""), data.get("page")))
         except (ValueError, image_input.ImageError) as error:
             self.send_json(400, {"error": str(error)})
         except Exception as error:
             self.send_json(500, {"error": f"Could not handle that request: {error}"})
 
 
-def scan_answer_sheet(image: str) -> dict:
-    """Read one photographed answer sheet. The sheet describes its own puzzle."""
+def scan_answer_sheet(image: str, page: object = 0) -> dict:
+    """Read one answer sheet out of an upload. The sheet describes its own puzzle.
+
+    Shares its shape with app.scan: an upload may be a photograph or a PDF, and a
+    PDF off a copier may hold the whole pile, so the caller asks for one page and
+    is told how many there are.
+    """
     if sheet_scan is None:
         raise RuntimeError(SHEET_SCAN_ERROR)
     # The page may send a re-encoded JPEG or, when the browser cannot decode the
-    # file itself, the original photo — HEIC straight off an iPhone included.
-    photo = image_input.load_data_url(image)
+    # file itself, the original photo — HEIC straight off an iPhone included, and
+    # a PDF always, since no browser can hand one over as pixels.
+    pages = image_input.load_data_url_pages(image)
     try:
-        return sheet_scan.scan_sheet(photo, GLYPHS, WORDS)
+        wanted = int(page or 0)
+    except (TypeError, ValueError):
+        raise ValueError("That page number is not a number.") from None
+    if not 0 <= wanted < len(pages):
+        raise ValueError(f"That upload has {len(pages)} page(s); page {wanted + 1} is not one of them.")
+    try:
+        result = sheet_scan.scan_sheet(pages[wanted], GLYPHS, WORDS)
     except sheet_scan.ScanError as error:
         raise ValueError(str(error)) from error
+    result["page"] = wanted
+    result["pages"] = len(pages)
+    return result
 
 
 def main() -> None:

@@ -198,3 +198,16 @@ footer { display:flex;justify-content:space-between;padding:15px 2px 0;font-size
   .make-grid,.make-grid-wide,.make-grid-four{grid-template-columns:1fr}.packet-files{grid-template-columns:1fr}
   .mode-tabs{grid-template-columns:1fr}.mode-tab{border-right:0;border-bottom:1px solid var(--line)}
 }
+
+/* Stepping through a PDF stack: one sheet is graded at a time, so the pile is
+   walked page by page rather than read all at once. */
+.scan-actions { display: flex; flex-direction: column; gap: 8px; }
+.stack-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+             border: 1px solid #aaa393; background: var(--panel); padding: 6px 8px; }
+.stack-bar span { font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                  letter-spacing: .08em; text-transform: uppercase; }
+.stack-step { border: 1px solid #aaa393; background: var(--paper); cursor: pointer;
+              font: 700 15px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+              padding: 2px 11px; }
+.stack-step:disabled { opacity: .35; cursor: default; }
+.stack-step:not(:disabled):hover { background: var(--yellow); }

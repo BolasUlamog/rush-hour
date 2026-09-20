@@ -146,6 +146,18 @@ reader can turn into a confident move drops out of the route and is reported. An
 automatically. A photo missing a corner square, or with an unreadable QR, is
 refused with an explanation rather than guessed at.
 
+Sheets arrive as photographs or as **PDFs**. A PDF is the one input that can hold
+a whole pile: a volunteer running the stack through a copier gets back a single
+file with thirty sheets in it, and those pages are far cleaner than any phone
+photo — the three-sheet fixture in `scan.test.py` reads every move with nothing
+flagged. Pages are rendered with pypdfium2, whose wheel is self-contained, because
+the deployment cannot install a poppler binary.
+
+Each sheet still has to be checked against the paper by a person, so a stack is
+walked one sheet at a time rather than read in one go; `/api/scan` takes a `page`
+and answers with `pages`. Reading a whole pile in one request is not an option
+anyway — a sheet takes several seconds and the function's ceiling is sixty.
+
 Each written cell is then read twice, by two independent recognizers:
 
 - **`models/glyphs.onnx`** — a small CNN trained on EMNIST handwriting, run through

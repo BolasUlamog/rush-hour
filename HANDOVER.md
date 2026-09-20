@@ -30,6 +30,15 @@ the page also tells the scanner which way up the photo is.
 `sheet_scan.py`: find the four corner squares → undo perspective → flatten the
 lighting → decode the QR → measure ink per cell → read the cells.
 
+Input is a photo **or a PDF** (`image_input.load_all`). A PDF can hold a whole
+copier stack, so `/api/scan` takes a `page` and reports `pages`, and the page
+steps through it one sheet at a time — each still needs a human to check it, and
+thirty sheets would blow the sixty-second function ceiling anyway. Copier pages
+read better than photographs: the three-sheet fixture reads every move unflagged.
+**Both entrypoints need changing together** — `app.py` serves the deployment and
+`server.py` is the local station, and they have separate scan routes; the PDF work
+passed every test while the local station still rejected PDFs.
+
 Two independent readers, which is the important design point:
 
 | reader | where | strength |

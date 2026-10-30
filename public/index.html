@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gridlock Sprint</title>
-  <link rel="stylesheet" href="styles-v2.css">
+  <link rel="stylesheet" href="styles-v2.css?v=3">
 </head>
 <body>
   <main class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Middle school math meet</p>
+        <p class="eyebrow">Math meet scoring</p>
         <h1>Gridlock Sprint</h1>
       </div>
       <div class="clock" aria-label="session time">
@@ -104,12 +104,15 @@
           <div><span>POINTS</span><strong id="tallyPoints">0</strong></div>
         </div>
         <div class="tally-body">
-          <div class="panel-heading compact">
+          <div class="panel-heading compact standings-heading">
             <div>
               <p class="kicker">Live standings</p>
               <h2>Team totals</h2>
             </div>
-            <button id="exportButton" class="text-button" type="button">Export CSV</button>
+            <div class="table-actions">
+              <a class="text-link" href="https://docs.google.com/spreadsheets/d/1dz3JvHJVnyB9i_ex8BslAvjRy7Ozv4wJ2HvjZV_4j58/edit" target="_blank" rel="noopener noreferrer">Open Google Sheet</a>
+              <button id="exportButton" class="text-button" type="button">Export CSV</button>
+            </div>
           </div>
           <div class="make-grid" id="contestFields">
             <label>Round <small>scores are kept per round</small>

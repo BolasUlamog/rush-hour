@@ -70,6 +70,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .sheets { display: grid; grid-template-columns: minmax(0, 3fr) minmax(340px, 2fr); gap: 28px; align-items: start; }
+.sheets.single-panel { display: block; }
+.single-panel .sheets-main { max-width: 760px; padding-right: 0; border-right: 0; }
 .sheets-main, .sheets-side { min-width: 0; }
 .sheets-main { padding-right: 28px; border-right: 1px solid var(--line); }
 .sheets-side { background: #fff; }

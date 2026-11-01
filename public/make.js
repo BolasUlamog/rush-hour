@@ -35,6 +35,7 @@
   let built = null;
 
   function setResult(status, title, detail) {
+    resultBox.hidden = false;
     const icons = { neutral: "•", success: "✓", error: "!", partial: "→" };
     resultBox.className = `result ${status}`;
     resultBox.replaceChildren();
@@ -48,6 +49,11 @@
     description.textContent = detail;
     copy.append(heading, description);
     resultBox.append(icon, copy);
+  }
+
+  function hideResult() {
+    resultBox.hidden = true;
+    resultBox.replaceChildren();
   }
 
   function readNumber(input, fallback) {
@@ -156,12 +162,12 @@
       renderTable(built);
       output.hidden = false;
       badge.textContent = `${built.puzzles.length} pages · ${built.totalPoints} pts`;
+      badge.hidden = false;
       if (shortfalls.length) {
         setResult("partial", `Generated ${built.puzzles.length} puzzles`,
           `${shortfalls.join("; ")}. Download the sheets, or generate again for a different set.`);
       } else {
-        setResult("success", `Generated ${built.puzzles.length} puzzles`,
-          `${built.totalPoints} points in total. Print the student sheets at 100% scale.`);
+        hideResult();
       }
     } catch (error) {
       setResult("error", "Generation failed", error.message);

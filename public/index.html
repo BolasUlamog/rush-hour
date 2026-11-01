@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gridlock Sprint</title>
-  <link rel="stylesheet" href="styles-v2.css?v=3">
+  <link rel="stylesheet" href="styles-v2.css?v=4">
 </head>
 <body>
   <main class="app-shell">
@@ -34,7 +34,7 @@
           <div>
             <h2>Read a filled sheet</h2>
           </div>
-          <div class="difficulty" id="scanStatusBadge">Ready</div>
+          <div class="difficulty" id="scanStatusBadge" hidden></div>
         </div>
         <div class="scan-grid">
           <label id="sheetUploadBox" class="upload-box" for="sheetPhoto">
@@ -57,10 +57,7 @@
           </div>
         </div>
 
-        <div id="sheetResult" class="result neutral" role="status">
-          <span class="result-icon">•</span>
-          <div><strong>Ready for a sheet</strong><p>The puzzle, its points and the answer key all come off the page itself.</p></div>
-        </div>
+        <div id="sheetResult" class="result neutral" role="status" hidden></div>
 
         <div class="sheet-readout" id="sheetReadout" hidden>
           <div class="sheet-identity">
@@ -118,20 +115,20 @@
             </label>
           </div>
           <p class="notation" id="scoreboardNote"></p>
-          <div id="tallyTable" class="tally-table"><p class="tally-empty">No sheets graded yet.</p></div>
-          <button id="resetTallyButton" class="secondary-button" type="button">Clear this round's scores</button>
+          <div id="tallyTable" class="tally-table"></div>
+          <button id="resetTallyButton" class="secondary-button" type="button" hidden>Clear this round's scores</button>
         </div>
       </aside>
     </section>
 
     <!-- ----------------------------------------------------- puzzle generator -->
-    <section class="sheets" id="makeView" role="tabpanel" hidden>
+    <section class="sheets single-panel" id="makeView" role="tabpanel" hidden>
       <div class="sheets-main">
         <div class="panel-heading">
           <div>
             <h2>Make puzzles &amp; sheets</h2>
           </div>
-          <div class="difficulty" id="makeBadge">Nothing yet</div>
+          <div class="difficulty" id="makeBadge" hidden></div>
         </div>
 
         <div class="make-grid">
@@ -167,10 +164,7 @@
 
         <button id="generateButton" class="generate-button" type="button">Generate puzzles <span>✦</span></button>
 
-        <div id="makeResult" class="result neutral" role="status">
-          <span class="result-icon">•</span>
-          <div><strong>Choose how many of each</strong><p>Puzzles are generated here in the browser, then laid out as printable sheets.</p></div>
-        </div>
+        <div id="makeResult" class="result neutral" role="status" hidden></div>
 
         <div id="makeOutput" hidden>
           <div class="packet-files">
@@ -185,33 +179,13 @@
         </div>
       </div>
 
-      <aside class="sheets-side">
-        <div class="tally-body">
-          <div class="panel-heading compact">
-            <div>
-              <h2>How it works</h2>
-            </div>
-          </div>
-          <ol class="steps">
-            <li>Each sheet prints its puzzle into a <b>QR square</b>, along with the number of answer rows and what the puzzle is worth.</li>
-            <li>Nothing is stored here. A sheet can be graded on any machine running this app, in any order, months later.</li>
-            <li>The <b>Answer sheets</b> tab reads that square, solves the board itself to find the shortest route, then reads the handwriting and checks it.</li>
-            <li>Print at <b>100% scale</b>. The four corner squares are how a photo gets straightened, so they must stay on the page.</li>
-          </ol>
-        </div>
-      </aside>
     </section>
-
-    <footer>
-      <span>Gridlock Sprint</span>
-      <span id="footerNote"></span>
-    </footer>
   </main>
 
   <script src="engine.js"></script>
   <script src="search.js"></script>
   <script src="puzzle_set.js"></script>
-  <script src="make.js"></script>
-  <script src="sheets.js?v=2"></script>
+  <script src="make.js?v=2"></script>
+  <script src="sheets.js?v=3"></script>
 </body>
 </html>

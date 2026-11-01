@@ -75,6 +75,7 @@
   }
 
   function setResult(status, title, detail) {
+    resultBox.hidden = false;
     const icons = { neutral: "•", success: "✓", error: "!", partial: "→" };
     resultBox.className = `result ${status}`;
     resultBox.replaceChildren();
@@ -88,6 +89,11 @@
     description.textContent = detail;
     copy.append(heading, description);
     resultBox.append(icon, copy);
+  }
+
+  function hideResult() {
+    resultBox.hidden = true;
+    resultBox.replaceChildren();
   }
 
   function contest() {
@@ -185,6 +191,7 @@
   function renderTally() {
     const data = standings || localStandings();
     const teams = data.teams || [];
+    const hasEntries = Boolean((data.entries || []).length);
     document.getElementById("tallyTeams").textContent = teams.length;
     document.getElementById("tallySheets").textContent = (data.entries || []).length;
     document.getElementById("tallyPoints").textContent = teams.reduce((sum, row) => sum + row.points, 0);
@@ -194,13 +201,10 @@
       ? ""
       : "Scores are only being saved on this device. The shared scoreboard is unavailable.";
     scoreboardNote.className = "notation warn";
+    resetTallyButton.hidden = !hasEntries;
 
     tallyTable.replaceChildren();
     if (!teams.length) {
-      const empty = document.createElement("p");
-      empty.className = "tally-empty";
-      empty.textContent = "No sheets graded yet.";
-      tallyTable.append(empty);
       return;
     }
     const table = document.createElement("table");
@@ -369,7 +373,7 @@
         uploadNote.textContent = "This browser cannot preview that format, so it will be read on the Mac instead.";
       }
       scanButton.disabled = false;
-      setResult("neutral", "Sheet loaded", "Read it, then check every row against the paper.");
+      hideResult();
     } catch (error) {
       setResult("error", "Could not load that photo", error.message);
     }
@@ -379,6 +383,7 @@
     if (!sheetImage) return;
     scanButton.disabled = true;
     scanButton.firstChild.textContent = "Reading the sheet… ";
+    statusBadge.hidden = false;
     statusBadge.textContent = "Reading";
     try {
       const response = await fetch("/api/scan", {
@@ -411,19 +416,16 @@
       const matched = matchTeam(data.team);
       teamInput.value = matched.team;
       showWarnings(matched.note ? [matched.note, ...data.warnings] : data.warnings);
-      statusBadge.textContent = data.puzzleCode;
-
-      const rowsRead = data.rows.filter(row => row.move).length;
       if (clean) {
-        setResult("success", `Read ${data.puzzleCode}`,
-          `${rowsRead} move${rowsRead === 1 ? "" : "s"} for team ${data.team || "—"}. Confirm and grade.`);
+        hideResult();
       } else {
         setResult("partial", `Read ${data.puzzleCode} with questions`,
           `${data.warnings.length} thing${data.warnings.length === 1 ? "" : "s"} to check against the paper.`);
       }
+      statusBadge.hidden = true;
       movesInput.focus();
     } catch (error) {
-      statusBadge.textContent = "Not read";
+      statusBadge.hidden = true;
       setResult("error", "Could not read that sheet", error.message);
     } finally {
       scanButton.disabled = false;
@@ -532,8 +534,8 @@
       uploadNote.textContent = "Still working through the uploaded PDF.";
     }
     if (resetResult) {
-      statusBadge.textContent = "Ready";
-      setResult("neutral", "Ready for the next sheet", "Photograph the whole page, corner squares included.");
+      statusBadge.hidden = true;
+      hideResult();
     }
   }
 

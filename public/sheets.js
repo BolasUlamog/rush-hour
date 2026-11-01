@@ -189,10 +189,11 @@
     document.getElementById("tallySheets").textContent = (data.entries || []).length;
     document.getElementById("tallyPoints").textContent = teams.reduce((sum, row) => sum + row.points, 0);
 
+    scoreboardNote.hidden = shared;
     scoreboardNote.textContent = shared
-      ? "Shared scoreboard: every volunteer grading this round writes here, and this list refreshes on its own."
-      : "No shared database, so these scores are only on this device. Several volunteers would each keep their own.";
-    scoreboardNote.className = shared ? "notation" : "notation warn";
+      ? ""
+      : "Scores are only being saved on this device. The shared scoreboard is unavailable.";
+    scoreboardNote.className = "notation warn";
 
     tallyTable.replaceChildren();
     if (!teams.length) {

@@ -10,7 +10,6 @@
   <main class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Math meet scoring</p>
         <h1>Gridlock Sprint</h1>
       </div>
       <div class="clock" aria-label="session time">
@@ -21,10 +20,10 @@
 
     <nav class="mode-tabs" role="tablist" aria-label="mode">
       <button id="tabSheets" class="mode-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="sheetsView">
-        Answer sheets <small>read a filled sheet and tally teams</small>
+        Answer sheets
       </button>
       <button id="tabMake" class="mode-tab" type="button" role="tab" aria-selected="false" aria-controls="makeView">
-        Make puzzles <small>generate puzzles and print their sheets</small>
+        Make puzzles
       </button>
     </nav>
 
@@ -33,13 +32,10 @@
       <div class="sheets-main">
         <div class="panel-heading">
           <div>
-            <p class="kicker">Sheet grading</p>
             <h2>Read a filled sheet</h2>
           </div>
           <div class="difficulty" id="scanStatusBadge">Ready</div>
         </div>
-        <p class="notation">Each sheet carries its own puzzle in the printed QR square, so there is nothing to choose here — photograph any sheet from any packet.</p>
-
         <div class="scan-grid">
           <label id="sheetUploadBox" class="upload-box" for="sheetPhoto">
             <input id="sheetPhoto" type="file" capture="environment"
@@ -106,7 +102,6 @@
         <div class="tally-body">
           <div class="panel-heading compact standings-heading">
             <div>
-              <p class="kicker">Live standings</p>
               <h2>Team totals</h2>
             </div>
             <div class="table-actions">
@@ -115,10 +110,10 @@
             </div>
           </div>
           <div class="make-grid" id="contestFields">
-            <label>Round <small>scores are kept per round</small>
+            <label>Round
               <input id="contestInput" type="text" maxlength="40" value="R1">
             </label>
-            <label>Your name <small>who graded a sheet</small>
+            <label>Grader
               <input id="graderInput" type="text" maxlength="40" placeholder="volunteer">
             </label>
           </div>
@@ -134,39 +129,38 @@
       <div class="sheets-main">
         <div class="panel-heading">
           <div>
-            <p class="kicker">Packet builder</p>
             <h2>Make puzzles &amp; sheets</h2>
           </div>
           <div class="difficulty" id="makeBadge">Nothing yet</div>
         </div>
 
         <div class="make-grid">
-          <label>Easy <small>7–12 moves</small>
+          <label>Easy puzzles (7–12 moves)
             <input id="countEasy" type="number" min="0" max="20" value="4">
           </label>
-          <label>Medium <small>13–20 moves</small>
+          <label>Medium puzzles (13–20 moves)
             <input id="countMedium" type="number" min="0" max="20" value="4">
           </label>
-          <label>Hard <small>21–40 moves</small>
+          <label>Hard puzzles (21–40 moves)
             <input id="countHard" type="number" min="0" max="20" value="2">
           </label>
         </div>
         <div class="make-grid">
-          <label>Points <small>easy</small>
+          <label>Easy points
             <input id="pointsEasy" type="number" min="0" max="99" value="4">
           </label>
-          <label>Points <small>medium</small>
+          <label>Medium points
             <input id="pointsMedium" type="number" min="0" max="99" value="8">
           </label>
-          <label>Points <small>hard</small>
+          <label>Hard points
             <input id="pointsHard" type="number" min="0" max="99" value="15">
           </label>
         </div>
         <div class="make-grid make-grid-wide">
-          <label>Packet label <small>printed on every page</small>
+          <label>Packet label
             <input id="packetLabel" type="text" maxlength="40" placeholder="GS-2026-R1">
           </label>
-          <label>Seed <small>blank for a new set each time</small>
+          <label>Seed (optional)
             <input id="packetSeed" type="number" min="0" placeholder="random">
           </label>
         </div>
@@ -195,8 +189,7 @@
         <div class="tally-body">
           <div class="panel-heading compact">
             <div>
-              <p class="kicker">Workflow</p>
-              <h2>One page, self-contained</h2>
+              <h2>How it works</h2>
             </div>
           </div>
           <ol class="steps">
@@ -219,6 +212,6 @@
   <script src="search.js"></script>
   <script src="puzzle_set.js"></script>
   <script src="make.js"></script>
-  <script src="sheets.js"></script>
+  <script src="sheets.js?v=2"></script>
 </body>
 </html>

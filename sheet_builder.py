@@ -62,7 +62,7 @@ def build_sheets(data: dict) -> tuple[bytes, str]:
     packet_id = str(data.get("packetId") or "RH-SHEETS").upper()[:40]
     manifest = {
         "packetId": packet_id,
-        "title": str(data.get("title") or "Middle School Math Meet")[:80],
+        "title": str(data.get("title") or "Stanford Mini Math Meet")[:80],
         "round": str(data.get("round") or "Rush Hour")[:80],
         "puzzles": puzzles,
         "totalPoints": sum(puzzle["points"] for puzzle in puzzles),

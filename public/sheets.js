@@ -11,8 +11,19 @@
    */
   const engine = window.RushHour;
   const MAX_PIXELS = 3000;
-  const STORE_KEY = "gridlock.tally.v2";          // only used when there is no shared database
-  const SETTINGS_KEY = "gridlock.settings.v1";
+  const STORE_KEY = "rushhour.tally.v2";          // only used when there is no shared database
+  const SETTINGS_KEY = "rushhour.settings.v1";
+  // Before the rename these lived under "gridlock.". A grader's saved round and
+  // name, and any scores held on the device while the scoreboard was unreachable,
+  // are carried across once and the old keys dropped. Delete this once every
+  // grading device has opened the renamed app.
+  try {
+    for (const [old, now] of [["gridlock.tally.v2", STORE_KEY], ["gridlock.settings.v1", SETTINGS_KEY]]) {
+      const value = localStorage.getItem(old);
+      if (value !== null && localStorage.getItem(now) === null) localStorage.setItem(now, value);
+      localStorage.removeItem(old);
+    }
+  } catch (error) { /* storage refused: nothing to carry across */ }
   const REFRESH_MS = 8000;
 
   const views = {

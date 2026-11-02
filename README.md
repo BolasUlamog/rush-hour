@@ -1,4 +1,4 @@
-# Gridlock Sprint
+# Rush Hour
 
 A Rush Hour-style contest kit for a physical middle-school math meet. Two pages,
 one idea: **every printed sheet carries its own puzzle**, so grading needs
@@ -17,7 +17,7 @@ Each page prints a QR square holding the board, the number of answer rows on
 that page, and what the puzzle is worth:
 
 ```
-GS1*GS-M-004*5*10*X202HA333VB422V…
+RH1*RH-M-004*5*10*X202HA333VB422V…
      code   pts rows  cars (id,row,col,length,orientation)
 ```
 
@@ -104,7 +104,7 @@ There is also a command-line path, which writes the same sheets to disk:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python make_packet.py --easy 4 --medium 4 --hard 2 \
-    --id GS-2026-R1 --open
+    --id RH-2026-R1 --open
 ```
 
 ## Grade the sheets
@@ -268,7 +268,7 @@ the grader is told it happened. Anything not within a letter or two of exactly
 one name is left as read, with the candidates named.
 
 Without a spreadsheet the same list is read from [`teams.txt`](teams.txt), or
-from `GRIDLOCK_TEAMS` as a comma separated list.
+from `RUSH_HOUR_TEAMS` as a comma separated list.
 
 "Anyone" means anyone holding the URL can post to it, which is what the token is
 for. Nothing else about the sheet is exposed.

@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 WORK = Path(tempfile.mkdtemp()) / "scores.sqlite3"
-os.environ.setdefault("GRIDLOCK_SCORES", str(WORK))
+os.environ.setdefault("RUSH_HOUR_SCORES", str(WORK))
 
 import app                                    # noqa: E402  (after the env var)
 import scores                                 # noqa: E402
@@ -74,10 +74,10 @@ def check_sheet_backend() -> list[str]:
     problems = []
     try:
         store = sheet_store.SheetStore(url, "secret")
-        store.save({"contest": "SHEET", "team": "BANANA", "puzzle": "GS-H-001",
+        store.save({"contest": "SHEET", "team": "BANANA", "puzzle": "RH-H-001",
                     "pointsPossible": 8, "pointsAwarded": 8, "status": "success",
                     "moves": "MD2", "movesUsed": 1, "optimal": 13, "gradedBy": "anna"})
-        store.save({"contest": "SHEET", "team": "BANANA", "puzzle": "GS-H-001",
+        store.save({"contest": "SHEET", "team": "BANANA", "puzzle": "RH-H-001",
                     "pointsPossible": 8, "pointsAwarded": 0, "status": "error",
                     "moves": "MD9", "movesUsed": 1, "optimal": 13, "gradedBy": "ben"})
         standings = store.standings("SHEET")
@@ -126,7 +126,7 @@ def main() -> int:
         }))
 
     # Four volunteers grading different sheets at the same moment.
-    work = [(f"volunteer-{i}", team, f"GS-H-{i:03d}", 8)
+    work = [(f"volunteer-{i}", team, f"RH-H-{i:03d}", 8)
             for i, team in enumerate(["BANANA", "APPLE", "CHERRY", "DATE"], 1)]
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda job: grade(*job), work))
@@ -138,11 +138,11 @@ def main() -> int:
         failures.append(f"concurrent writes produced {len(standings['entries'])} sheets, wanted 4")
 
     # Re-grading the same sheet replaces the score; a retry cannot double-count.
-    grade("volunteer-1", "BANANA", "GS-H-001", 0)
-    grade("volunteer-9", "BANANA", "GS-H-001", 8)
+    grade("volunteer-1", "BANANA", "RH-H-001", 0)
+    grade("volunteer-9", "BANANA", "RH-H-001", 8)
     standings = store.standings(contest)
     banana = next(row for row in standings["teams"] if row["team"] == "BANANA")
-    entry = next(e for e in standings["entries"] if e["team"] == "BANANA" and e["puzzle"] == "GS-H-001")
+    entry = next(e for e in standings["entries"] if e["team"] == "BANANA" and e["puzzle"] == "RH-H-001")
     replace_ok = banana["points"] == 8 and banana["sheets"] == 1 and entry["gradedBy"] == "volunteer-9"
     print(f"{'ok ' if replace_ok else 'FAIL'} re-grading replaces: BANANA has {banana['points']} points "
           f"over {banana['sheets']} sheet(s), last graded by {entry['gradedBy']}")
@@ -171,8 +171,8 @@ def main() -> int:
         failures.append("a blank team ID was accepted")
 
     # Rounds are separate scoreboards.
-    grade("volunteer-1", "BANANA", "GS-H-001", 8)
-    store.save(app.clean_entry({"contest": "OTHER-ROUND", "team": "BANANA", "puzzle": "GS-H-001",
+    grade("volunteer-1", "BANANA", "RH-H-001", 8)
+    store.save(app.clean_entry({"contest": "OTHER-ROUND", "team": "BANANA", "puzzle": "RH-H-001",
                                 "pointsPossible": 8, "pointsAwarded": 2, "status": "success",
                                 "moves": "XR1", "movesUsed": 1, "optimal": 1, "gradedBy": "v"}))
     separate_ok = (store.standings(contest)["teams"][0]["points"] == 8

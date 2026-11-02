@@ -10,7 +10,7 @@ shortest route, and then checks what the student wrote.
 Payload, deliberately short and inside QR's alphanumeric character set so the
 code stays low-density and easy to decode from a phone photo:
 
-    GS1*<code>*<points>*<rows>*<cars>
+    RH1*<code>*<points>*<rows>*<cars>
 
 where <cars> is a run of five-character car records, each one
 <id><row><col><length><orientation>, for example X202H = car X, row 2, column 0,
@@ -19,14 +19,14 @@ length 2, horizontal.
 
 from __future__ import annotations
 
-VERSION = "GS1"
+VERSION = "RH1"
 SEPARATOR = "*"
 CAR_WIDTH = 5
 ORIENTATIONS = ("H", "V")
 
 
 class SheetCodeError(ValueError):
-    """The payload is not a Gridlock sheet code."""
+    """The payload is not a Rush Hour sheet code."""
 
 
 def encode_cars(cars: list[dict]) -> str:
@@ -79,7 +79,7 @@ def decode(payload: str) -> dict:
     text = (payload or "").strip().upper()
     fields = text.split(SEPARATOR)
     if len(fields) != 5:
-        raise SheetCodeError("This is not a Gridlock sheet code.")
+        raise SheetCodeError("This is not a Rush Hour sheet code.")
     version, code, points, rows, cars = fields
     if version != VERSION:
         raise SheetCodeError(
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         {"id": "X", "row": 2, "col": 0, "length": 2, "orientation": "H"},
         {"id": "A", "row": 3, "col": 3, "length": 3, "orientation": "V"},
     ]
-    payload = encode("GS-M-004", 5, 10, sample)
+    payload = encode("RH-M-004", 5, 10, sample)
     print(payload)
     assert decode(payload)["cars"] == sample
     assert decode(payload)["points"] == 5 and decode(payload)["rows"] == 10

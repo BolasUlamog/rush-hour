@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build a printable Gridlock Sprint packet: student PDF, answer key, and manifest.
+"""Build a printable Rush Hour packet: student PDF, answer key, and manifest.
 
 The grading station reads the manifest, so keep the three files together.
 
-    python3 make_packet.py --easy 4 --medium 4 --hard 2 --id GS-2026-R1
+    python3 make_packet.py --easy 4 --medium 4 --hard 2 --id RH-2026-R1
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ def main() -> None:
 
     stamp = datetime.now()
     seed = args.seed if args.seed is not None else int(stamp.timestamp()) % 2147483647
-    packet_id = args.packet_id or f"GS-{stamp:%Y%m%d}-{seed % 1000:03d}"
+    packet_id = args.packet_id or f"RH-{stamp:%Y%m%d}-{seed % 1000:03d}"
 
     config = {
         "seed": seed,

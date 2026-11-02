@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
   /**
-   * Fast state-space search over a Gridlock board.
+   * Fast state-space search over a Rush Hour board.
    *
    * engine.js stays the referee — it parses and judges a student's route. This
    * module exists because generating a genuinely hard puzzle means walking the

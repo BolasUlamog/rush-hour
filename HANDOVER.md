@@ -1,4 +1,4 @@
-# Gridlock Sprint — handover
+# Rush Hour — handover
 
 Rush Hour contest kit for a middle-school math meet. Two halves: generate puzzles
 and print sheets; photograph filled sheets and tally teams.
@@ -15,7 +15,7 @@ and print sheets; photograph filled sheets and tally teams.
 **Every printed sheet carries its own puzzle in a QR square** (`sheet_code.py`):
 
 ```
-GS1*GS-M-004*5*10*X202HA333VB422V…
+RH1*RH-M-004*5*10*X202HA333VB422V…
      code   pts rows  cars (id,row,col,length,orientation)
 ```
 
@@ -63,6 +63,22 @@ normalizes to a glyph peaking near 80/255 where every stock EMNIST glyph peaks a
 test set against 87.5% with it, and 54.8% against 96.6% on car labels. On clean
 glyphs the two are indistinguishable, which is exactly why the clean number was
 never the one to chase.
+
+## The rename, and the one thing it left behind
+
+This was "Gridlock Sprint" with `GS` codes until 2026-11-02, when it became Rush
+Hour with `RH` codes everywhere: `RH1` in the QR, `RH-E-001` puzzle codes, `RH-…`
+packet IDs. The scanner accepts **only** `RH1`, so a sheet printed before then is
+refused with "printed by a different version — reprint it". That was a deliberate
+clean break.
+
+What it left behind: the three real photos in `tests/` are GS-era sheets. They are
+still the most valuable fixtures here, so `scan.test.py` relabels their QR text
+for the test only (`_decode_legacy_fixture`, at the top). **Replace them** with
+three photos of filled RH sheets — one flat, one with a crossed-out row, one on a
+curled page — and delete that helper. `sheets.js` also carries graders' saved
+settings and offline tallies across from the old `gridlock.*` storage keys once;
+that can go after every grading device has opened the renamed app.
 
 ## Difficulty
 

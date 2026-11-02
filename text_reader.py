@@ -26,7 +26,7 @@ from PIL import Image
 
 APP_DIR = Path(__file__).resolve().parent
 SOURCE = APP_DIR / "handwriting_ocr.swift"
-BINARY = Path(tempfile.gettempdir()) / "gridlock-handwriting-ocr"
+BINARY = Path(tempfile.gettempdir()) / "rush-hour-handwriting-ocr"
 SWIFTC = "/usr/bin/swiftc"
 
 
@@ -59,8 +59,8 @@ class TextReader:
             return False
         environment = os.environ.copy()
         cache = Path(tempfile.gettempdir())
-        environment["SWIFT_MODULECACHE_PATH"] = str(cache / "gridlock-swift-cache")
-        environment["CLANG_MODULE_CACHE_PATH"] = str(cache / "gridlock-clang-cache")
+        environment["SWIFT_MODULECACHE_PATH"] = str(cache / "rush-hour-swift-cache")
+        environment["CLANG_MODULE_CACHE_PATH"] = str(cache / "rush-hour-clang-cache")
         try:
             process = subprocess.run(
                 [SWIFTC, str(self.source), "-o", str(self.binary)],

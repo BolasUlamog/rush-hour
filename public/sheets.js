@@ -560,7 +560,7 @@
       return;
     }
     const quote = value => `"${String(value === null || value === undefined ? "" : value).replace(/"/g, '""')}"`;
-    const rows = [[`Gridlock Sprint ${data.contest} team totals`].map(quote).join(",")];
+    const rows = [[`Rush Hour ${data.contest} team totals`].map(quote).join(",")];
     rows.push(["team", "points", "puzzles solved", "sheets graded"].map(quote).join(","));
     data.teams.forEach(row => rows.push([row.team, row.points, row.solved, row.sheets].map(quote).join(",")));
     rows.push("");
@@ -576,7 +576,7 @@
     const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `gridlock-${data.contest}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `rush-hour-${data.contest}-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   });

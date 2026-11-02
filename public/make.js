@@ -204,7 +204,7 @@
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `gridlock-${built.packetId}-${kind === "key" ? "key" : "sheets"}.pdf`;
+      link.download = `rush-hour-${built.packetId}-${kind === "key" ? "key" : "sheets"}.pdf`;
       link.click();
       // Also open it, so printing is one step rather than a trip to Downloads.
       window.open(url, "_blank");

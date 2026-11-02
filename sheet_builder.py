@@ -63,9 +63,9 @@ def build_sheets(data: dict) -> tuple[bytes, str]:
     manifest = {
         "packetId": packet_id,
         "title": str(data.get("title") or "Middle School Math Meet")[:80],
-        "round": str(data.get("round") or "Gridlock Sprint")[:80],
+        "round": str(data.get("round") or "Rush Hour")[:80],
         "puzzles": puzzles,
         "totalPoints": sum(puzzle["points"] for puzzle in puzzles),
     }
-    filename = f"gridlock-{packet_id}-{'key' if kind == 'key' else 'sheets'}.pdf"
+    filename = f"rush-hour-{packet_id}-{'key' if kind == 'key' else 'sheets'}.pdf"
     return packet_pdf.render_bytes(manifest, kind), filename

@@ -40,7 +40,7 @@
     counts: { easy: 4, medium: 4, hard: 2 },
     points: { easy: 4, medium: 8, hard: 15 },
     title: "Middle School Math Meet",
-    round: "Gridlock Sprint",
+    round: "Rush Hour",
     stateLimit: 400000
   };
   const SIZE = 6;

@@ -178,7 +178,7 @@ def main() -> None:
     if server is None:
         raise RuntimeError("Could not find an available local port from 8765 through 8774.")
     url = f"http://127.0.0.1:{port}"
-    print(f"\nGridlock Sprint grading station is running at {url}")
+    print(f"\nRush Hour grading station is running at {url}")
     print("Press Control-C to stop it.\n")
     threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:

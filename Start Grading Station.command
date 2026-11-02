@@ -1,7 +1,7 @@
 #!/bin/zsh
 cd "$(dirname "$0")"
 clear
-echo "Starting Gridlock Sprint…"
+echo "Starting Rush Hour…"
 # The project virtualenv carries Pillow and ReportLab, which answer-sheet
 # scanning and packet building need. Fall back to the system Python for
 # move-by-move grading only.

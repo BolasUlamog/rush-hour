@@ -28,10 +28,30 @@ import sheet_layout
 import sheet_scan
 import text_reader
 import fill_sheet
+import sheet_code
 
 APP_DIR = Path(__file__).resolve().parent
 WORK = APP_DIR / "tmp" / "scan-test"
-MANIFEST = APP_DIR / "output" / "packets" / "GS-TEST" / "manifest.json"
+MANIFEST = APP_DIR / "output" / "packets" / "RH-TEST" / "manifest.json"
+
+# --- Legacy fixtures ------------------------------------------------------- #
+# The three real photos in tests/ were printed before sheet codes moved from GS
+# to RH, so their QR squares say GS1*GS-... and the app rightly refuses them now.
+# They are still the most valuable fixtures in this suite -- real lighting, real
+# paper, real pencil -- so until replacement photos of RH sheets are taken, their
+# QR text is relabelled here, for this test only. The app itself has no GS left.
+# DELETE THIS once new photos are in tests/, and update the codes they expect.
+_decode_sheet_code = sheet_code.decode
+
+
+def _decode_legacy_fixture(payload: str) -> dict:
+    text = (payload or "").strip().upper()
+    if text.startswith("GS1*GS-"):
+        text = "RH1*RH-" + text[len("GS1*GS-"):]
+    return _decode_sheet_code(text)
+
+
+sheet_code.decode = _decode_legacy_fixture
 
 # page, team, moves (None = the answer key), handwriting style, direction words.
 # Pages 1-3 are easy, 4-6 medium (two answer blocks), 7-8 hard (two or three
@@ -57,7 +77,7 @@ def build_packet() -> dict:
     if not MANIFEST.exists():
         subprocess.run(
             [sys.executable, str(APP_DIR / "make_packet.py"), "--easy", "3", "--medium", "3",
-             "--hard", "2", "--seed", "4242", "--id", "GS-TEST"],
+             "--hard", "2", "--seed", "4242", "--id", "RH-TEST"],
             check=True, capture_output=True, cwd=str(APP_DIR),
         )
     manifest = json.loads(MANIFEST.read_text())
@@ -177,7 +197,7 @@ def main() -> int:
         struck = [row["row"] for row in read["rows"] if row["struck"]]
         invented = [row["row"] for row in read["rows"] if row["row"] > 11 and row["move"]]
         real_ok = (
-            read["puzzleCode"] == "GS-M-001"
+            read["puzzleCode"] == "RH-M-001"
             and read["team"] == "BANANA"
             and read["moves"] == expected_route
             and struck == [5]          # row 5 is crossed out on the paper
@@ -204,7 +224,7 @@ def main() -> int:
         struck = [row["row"] for row in read["rows"] if row["struck"]]
         invented = [row["row"] for row in read["rows"] if row["row"] >= 15 and row["move"]]
         struck_ok = (
-            read["puzzleCode"] == "GS-H-001"
+            read["puzzleCode"] == "RH-H-001"
             and read["team"] == "BANANA"
             and read["moves"] == expected_route
             and struck == [2]          # row 2 is scratched out on the paper
@@ -243,7 +263,7 @@ def main() -> int:
         rows = [row for row in read["rows"] if not row["struck"]]
         correct = sum(1 for row in rows if row["move"] == written.get(row["row"]))
         curled_ok = (
-            read["puzzleCode"] == "GS-G-001"
+            read["puzzleCode"] == "RH-G-001"
             and read["points"] == 15
             and read["sheetRows"] == 25
             and struck == [13]        # row 13 is scratched out on the paper
@@ -279,7 +299,7 @@ def main() -> int:
                   if row["move"] != want and not row["needsReview"]]
         deployed_ok = (
             lines.available
-            and read["puzzleCode"] == "GS-M-001"
+            and read["puzzleCode"] == "RH-M-001"
             and read["team"] == "BANANA"
             and correct >= 9          # the pair of readers manages 10 of 10
             and not silent

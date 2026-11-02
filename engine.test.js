@@ -118,4 +118,4 @@ assert.ok(
     `only ${forcesRetreat} of ${compared} sifted starts force the X car backwards`);
 }
 
-console.log("All Gridlock Sprint engine tests passed.");
+console.log("All Rush Hour engine tests passed.");

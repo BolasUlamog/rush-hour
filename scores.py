@@ -131,11 +131,11 @@ class ScoreStore:
         goes there — per instance, which is exactly why `shared` reports False in
         that case and the app tells the grader to expect it.
         """
-        override = (os.environ.get("GRIDLOCK_SCORES") or "").strip()
+        override = (os.environ.get("RUSH_HOUR_SCORES") or "").strip()
         if override:
             return Path(override)
         if self.serverless:
-            return Path(tempfile.gettempdir()) / "gridlock-scores.sqlite3"
+            return Path(tempfile.gettempdir()) / "rush-hour-scores.sqlite3"
         return APP_DIR / "output" / "scores.sqlite3"
 
     def _connect(self):
@@ -212,11 +212,11 @@ class ScoreStore:
     def team_names(self) -> list[str]:
         """The acceptable team names, when running without a spreadsheet.
 
-        Set GRIDLOCK_TEAMS to a comma separated list, or put one name per line in
+        Set RUSH_HOUR_TEAMS to a comma separated list, or put one name per line in
         teams.txt. An empty list simply means no correction is offered. With a
         spreadsheet configured the TEAMS tab is used instead of either.
         """
-        names = [name.strip().upper() for name in (os.environ.get("GRIDLOCK_TEAMS") or "").split(",")]
+        names = [name.strip().upper() for name in (os.environ.get("RUSH_HOUR_TEAMS") or "").split(",")]
         names = [name for name in names if name]
         if names:
             return sorted(set(names))

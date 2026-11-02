@@ -105,7 +105,7 @@ def main() -> int:
         try:
             pdf, filename = sheet_builder.build_sheets({
                 "kind": kind,
-                "packetId": "GS-LEVELS",
+                "packetId": "RH-LEVELS",
                 "puzzles": built["puzzles"],
             })
             ok = pdf.startswith(b"%PDF") and len(pdf) > 2000

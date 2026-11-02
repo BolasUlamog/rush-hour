@@ -4,7 +4,7 @@
 This exists so sheet_scan can be exercised end to end without a printer and a
 camera. It is a development tool, not part of the grading station.
 
-    python3 fill_sheet.py output/packets/GS-DEMO/manifest.json --page 1 \
+    python3 fill_sheet.py output/packets/RH-DEMO/manifest.json --page 1 \
         --team 7B --moves BU1,FD1,XR3 --out tmp/sheets/filled.png --photo
 """
 

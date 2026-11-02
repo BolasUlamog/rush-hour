@@ -1,5 +1,5 @@
 [project]
-name = "gridlock-sprint"
+name = "rush-hour"
 version = "1.0.0"
 description = "Rush Hour contest sheets that carry their own puzzle"
 requires-python = ">=3.12"

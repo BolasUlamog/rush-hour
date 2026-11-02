@@ -211,7 +211,7 @@
     const sorted = [...found].sort((a, b) => order[a.level] - order[b.level]);
     const puzzles = sorted.map((puzzle, index) => ({
       index: index + 1,
-      code: `GS-${LEVEL_CODE[puzzle.level]}-${String(index + 1).padStart(3, "0")}`,
+      code: `RH-${LEVEL_CODE[puzzle.level]}-${String(index + 1).padStart(3, "0")}`,
       level: puzzle.level,
       points: Number(settings.points[puzzle.level]),
       shortestMoves: puzzle.shortestMoves,
@@ -219,7 +219,7 @@
       solution: puzzle.solution
     }));
     return {
-      packetId: settings.packetId || `GS-${settings.seed}`,
+      packetId: settings.packetId || `RH-${settings.seed}`,
       title: settings.title,
       round: settings.round,
       seed: settings.seed,

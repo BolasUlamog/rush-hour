@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a Gridlock Sprint packet: one puzzle page per puzzle, plus an answer key.
+"""Render a Rush Hour packet: one puzzle page per puzzle, plus an answer key.
 
 Each page carries its own registration marks, a printed puzzle code, write-in
 team-ID boxes, the board, and the answer table. Every rectangle comes from
@@ -173,7 +173,8 @@ def draw_puzzle_page(pdf, manifest, puzzle, page, overlay=None):
     pdf.drawString(L.MARGIN, 750, f"{manifest['title'].upper()} / {manifest['round'].upper()}")
     pdf.setFillColor(INK)
     pdf.setFont("Helvetica-Bold", 24)
-    pdf.drawString(L.MARGIN, page["titleBaseline"], f"Puzzle {puzzle['code']}")
+    pdf.drawString(L.MARGIN, page["titleBaseline"],
+                   f"Puzzle {puzzle['index']} \u00b7 {levels.name(puzzle['level'])}")
     pdf.setFont("Helvetica", 8)
     pdf.setFillColor(MUTED)
     pdf.drawString(L.MARGIN + 1, 706, "Move the red X car through the exit. Record every move below in order.")
@@ -201,7 +202,7 @@ def draw_puzzle_page(pdf, manifest, puzzle, page, overlay=None):
     pdf.drawString(L.MARGIN, 42, "One row per move, in CAPITAL letters. Write the number of spaces moved. Cross out mistakes completely and use the next row.")
     pdf.drawRightString(
         L.PAGE_W - L.MARGIN, 42,
-        f"FORM GS-02 / {manifest['packetId']} / PUZZLE {puzzle['index']} OF {len(manifest['puzzles'])}",
+        f"{puzzle['code']} / {manifest['packetId']} / PUZZLE {puzzle['index']} OF {len(manifest['puzzles'])}",
     )
     if overlay is not None:
         overlay(pdf, puzzle, page)
@@ -256,7 +257,7 @@ def draw_key(pdf, manifest):
 
         pdf.setFillColor(MUTED)
         pdf.setFont("Helvetica", 6.5)
-        pdf.drawRightString(L.PAGE_W - L.MARGIN, 42, f"FORM GS-02-KEY / {manifest['packetId']}")
+        pdf.drawRightString(L.PAGE_W - L.MARGIN, 42, f"ANSWER KEY / {manifest['packetId']}")
         pdf.showPage()
 
 
@@ -282,7 +283,6 @@ def resolve_pages(manifest: dict) -> dict:
         rows = L.row_count(puzzle["shortestMoves"])
         puzzle["sheetRows"] = rows
         puzzle["layout"] = L.layout(rows)
-    manifest["form"] = "GS-02"
     return manifest
 
 

@@ -1,5 +1,5 @@
 /**
- * Gridlock Sprint scoreboard, kept in this spreadsheet.
+ * Rush Hour scoreboard, kept in this spreadsheet.
  *
  * Paste this into Extensions > Apps Script on the sheet you want the scores in,
  * then Deploy > New deployment > Web app, with:

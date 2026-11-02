@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read a photographed Gridlock Sprint answer sheet into structured rows.
+"""Read a photographed Rush Hour answer sheet into structured rows.
 
 Pipeline:
   1. locate the four printed registration squares in the photo

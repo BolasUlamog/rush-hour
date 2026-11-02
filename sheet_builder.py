@@ -36,7 +36,7 @@ def clean_puzzles(raw: object) -> list[dict]:
         solution = [str(move).upper() for move in item.get("solution", []) if str(move).strip()]
         puzzle = {
             "index": index,
-            "code": str(item.get("code") or f"GS-{index:03d}").upper(),
+            "code": str(item.get("code") or f"RH-{index:03d}").upper(),
             "level": level,
             "points": max(0, min(99, int(item.get("points", 0)))),
             "shortestMoves": max(1, min(40, int(item.get("shortestMoves", len(solution) or 1)))),
@@ -59,7 +59,7 @@ def build_sheets(data: dict) -> tuple[bytes, str]:
     """Lay out a packet or its answer key and hand back the PDF."""
     kind = "key" if str(data.get("kind", "packet")).lower() == "key" else "packet"
     puzzles = clean_puzzles(data.get("puzzles"))
-    packet_id = str(data.get("packetId") or "GS-SHEETS").upper()[:40]
+    packet_id = str(data.get("packetId") or "RH-SHEETS").upper()[:40]
     manifest = {
         "packetId": packet_id,
         "title": str(data.get("title") or "Middle School Math Meet")[:80],

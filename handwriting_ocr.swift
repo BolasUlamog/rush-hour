@@ -212,7 +212,7 @@ func readRegions(_ image: CGImage, _ regions: [RegionRequest]) -> [RegionResult]
     }
 }
 
-/// Read any QR codes in the image. A Gridlock sheet carries its puzzle in one,
+/// Read any QR codes in the image. A Rush Hour sheet carries its puzzle in one,
 /// and the code's position on the page also reveals which way up the photo is.
 func readBarcodes(_ image: CGImage) -> [BarcodeResult] {
     var observations: [VNBarcodeObservation] = []

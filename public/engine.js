@@ -114,13 +114,43 @@
     return { ok: true, cars: next };
   }
 
+  /**
+   * X driving out through the exit on the last move, by any distance that gets it there.
+   *
+   * The exit is an opening in the wall, so a student who writes XR5 when X only
+   * needed three squares has still driven it out; counting the extra squares as
+   * "leaving the board" scored correct solutions zero. This applies only to X,
+   * only to the final move, and only when nothing stands between X and the exit.
+   */
+  function escapeThroughExit(cars, move) {
+    if (move.id !== "X" || move.direction !== "R") return null;
+    const target = cars.find(car => car.id === "X");
+    if (!target || target.orientation !== "H" || target.row !== 2) return null;
+    const needed = SIZE - (target.col + target.length);
+    if (needed < 1 || move.distance < needed) return null;
+    const grid = occupied(cars, "X");
+    for (let col = target.col + target.length; col < SIZE; col++) {
+      if (grid[target.row][col]) return null;
+    }
+    const next = cloneCars(cars);
+    next.find(car => car.id === "X").col = SIZE - target.length;
+    return next;
+  }
+
   function validateSolution(startCars, text) {
     const parsed = parseSolution(text);
     if (parsed.errors.length) return { status: "error", message: parsed.errors[0], moveNumber: 0 };
     let cars = cloneCars(startCars);
     for (let i = 0; i < parsed.moves.length; i++) {
       const result = applyMove(cars, parsed.moves[i]);
-      if (!result.ok) return { status: "error", message: `Move ${i + 1}: ${result.reason}`, moveNumber: i + 1, cars };
+      if (!result.ok) {
+        const escaped = i === parsed.moves.length - 1 ? escapeThroughExit(cars, parsed.moves[i]) : null;
+        if (escaped) {
+          cars = escaped;
+          continue;
+        }
+        return { status: "error", message: `Move ${i + 1}: ${result.reason}`, moveNumber: i + 1, cars };
+      }
       cars = result.cars;
     }
     if (isSolved(cars)) return { status: "success", message: `Solved in ${parsed.moves.length} move${parsed.moves.length === 1 ? "" : "s"}!`, moves: parsed.moves, cars };

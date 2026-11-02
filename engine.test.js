@@ -14,6 +14,31 @@ assert.equal(engine.validateSolution(board, "XR2").status, "error");
 assert.equal(engine.validateSolution(board, "AU1, XR4").status, "success");
 assert.match(engine.validateSolution(board, "AL1").message, /only move up or down/);
 
+// Driving X out through the exit by more than it needed still counts, but only
+// as the last move, only for X, and only with a clear path to the exit.
+{
+  const open = [
+    { id: "X", row: 2, col: 2, length: 2, orientation: "H" },      // two squares from the exit
+    { id: "A", row: 0, col: 0, length: 2, orientation: "V" },
+    { id: "B", row: 4, col: 3, length: 3, orientation: "H" }
+  ];
+  for (const route of ["XR2", "XR3", "XR5", "AD1, XR4"]) {
+    assert.equal(engine.validateSolution(open, route).status, "success", `${route} drives X out`);
+  }
+  assert.equal(engine.validateSolution(open, "XR1").status, "partial", "one short of the exit is not out");
+  assert.equal(engine.validateSolution(open, "XR3, AD1").status, "error",
+    "overshooting is only the exit when it is the last move");
+  assert.match(engine.validateSolution(open, "BR3").message, /would leave the board/,
+    "only X leaves through the exit");
+  assert.match(engine.validateSolution(open, "AU3").message, /would leave the board/,
+    "a vertical car cannot leave either");
+
+  const blocked = [...open, { id: "C", row: 1, col: 5, length: 2, orientation: "V" }];  // covers the exit square
+  assert.match(engine.validateSolution(blocked, "XR4").message, /blocked by car C/,
+    "a car in the way still blocks X, however far it is driven");
+  assert.equal(engine.validateSolution(blocked, "CU1, XR4").status, "success");
+}
+
 for (const level of ["easy", "medium", "hard"]) {
   const puzzle = engine.generatePuzzle(level, 12345 + level.length);
   assert.ok(puzzle);

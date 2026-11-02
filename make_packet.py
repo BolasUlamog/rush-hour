@@ -54,7 +54,7 @@ def main() -> None:
 
     parser.add_argument("--seed", type=int, default=None, help="repeat a previous packet exactly")
     parser.add_argument("--id", dest="packet_id", default=None, help="packet code printed on every page")
-    parser.add_argument("--title", default="Middle School Math Meet")
+    parser.add_argument("--title", default="Stanford Mini Math Meet")
     parser.add_argument("--round", dest="round_name", default="Rush Hour")
     parser.add_argument("--out", type=Path, default=DEFAULT_ROOT, help="folder that holds packet folders")
     parser.add_argument("--open", dest="open_pdfs", action="store_true",

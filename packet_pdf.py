@@ -16,7 +16,7 @@ from pathlib import Path
 from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
-from reportlab.lib.colors import Color, HexColor, black, white
+from reportlab.lib.colors import HexColor, black, white
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
@@ -25,18 +25,31 @@ import levels
 import sheet_code
 import sheet_layout as L
 
-INK = HexColor("#18212A")
-PAPER = HexColor("#FFFDF7")
-GRID = HexColor("#D8D0C0")
-RED = HexColor("#E94B35")
-YELLOW = HexColor("#F2BD3D")
-MUTED = HexColor("#6D706C")
-LINE = HexColor("#AAA394")
+# Stanford Mini Math Meet colours, taken from the site's own tokens in
+# public/styles-v2.css so the paper and the screen look like one event.
+INK = HexColor("#4F1730")        # --ink
+BRAND = HexColor("#7B002C")      # --blue: the maroon
+MUTED = HexColor("#87656F")      # --muted
+LINE = HexColor("#D8AFB7")       # --line
+PAPER = white                    # no tint to print, and the cleanest ground for the scanner
+GRID = HexColor("#F1DCE1")       # the board's floor
+BADGE = HexColor("#F6DDE3")
+# Every car but X stays light, so its maroon letter reads clearly and X -- the
+# one dark car -- is unmistakable even off a black-and-white printer.
 COLORS = [
-    HexColor("#D69C32"), HexColor("#745D8A"), HexColor("#BE6B4A"),
-    HexColor("#4D8990"), HexColor("#A96A79"), HexColor("#3F7897"),
-    HexColor("#5E917A"), HexColor("#6B7A94"), HexColor("#94744E"),
+    HexColor("#EFB3C1"), HexColor("#F3C9A6"), HexColor("#E5D2A8"),
+    HexColor("#D9B7D6"), HexColor("#E8A9A0"), HexColor("#EBCB7E"),
+    HexColor("#C9BEE0"), HexColor("#F2D0D6"), HexColor("#D8B79F"),
 ]
+
+# Printed artwork, cut from the meet's own illustrations (see sheet_art/README.md).
+# Everything here sits outside the corner-mark search windows or is line art
+# with no solid mark-sized shapes, so none of it can be mistaken for a corner.
+ART = Path(__file__).resolve().parent / "sheet_art"
+BADGE_ART = ART / "meet-badge.png"
+LEFT_ART = ART / "fossil-triceratops.png"
+RIGHT_ART = ART / "fossil-trex.png"
+HEADER_X = L.MARGIN + 64.0       # header text starts right of the badge
 
 
 def centered_text(pdf, text, x, y, width, font="Helvetica-Bold", size=11, color=INK):
@@ -60,7 +73,7 @@ def draw_board(pdf, cars, rect, label_size=16, exit_label=True):
     pdf.setStrokeColor(INK)
     pdf.setLineWidth(5)
     pdf.rect(x, y, size, size, fill=1, stroke=1)
-    pdf.setStrokeColor(Color(1, 1, 1, alpha=0.35))
+    pdf.setStrokeColor(white)
     pdf.setLineWidth(0.6)
     for i in range(1, L.GRID):
         pdf.line(x + i * cell, y, x + i * cell, y + size)
@@ -73,19 +86,21 @@ def draw_board(pdf, cars, rect, label_size=16, exit_label=True):
         car_y = y + size - (car["row"] + (1 if horizontal else car["length"])) * cell + inset
         car_w = (car["length"] if horizontal else 1) * cell - 2 * inset
         car_h = (1 if horizontal else car["length"]) * cell - 2 * inset
-        pdf.setFillColor(RED if car["id"] == "X" else COLORS[(index - 1) % len(COLORS)])
+        is_x = car["id"] == "X"
+        pdf.setFillColor(BRAND if is_x else COLORS[(index - 1) % len(COLORS)])
         pdf.setStrokeColor(INK)
         pdf.setLineWidth(1.3)
         pdf.roundRect(car_x, car_y, car_w, car_h, min(5, cell * 0.14), fill=1, stroke=1)
         # Capitals only: a handwritten lowercase "l" is unreadable next to "1".
         label = car["id"].upper()
-        centered_text(pdf, label, car_x, car_y + car_h / 2 - label_size * 0.33, car_w, size=label_size, color=white)
+        centered_text(pdf, label, car_x, car_y + car_h / 2 - label_size * 0.33, car_w, size=label_size,
+                      color=white if is_x else INK)
 
     exit_y = y + size - 3 * cell
     pdf.setFillColor(PAPER)
     pdf.rect(x + size - 3, exit_y + 3, 9, cell - 6, fill=1, stroke=0)
     if exit_label:
-        pdf.setFillColor(RED)
+        pdf.setFillColor(BRAND)
         pdf.setFont("Helvetica-Bold", 8)
         pdf.drawString(x + size + 11, exit_y + cell / 2 - 3, "EXIT >")
 
@@ -110,10 +125,35 @@ def draw_sheet_code(pdf, puzzle, page):
     return payload
 
 
+def draw_fossils(pdf, board):
+    """Two fossil skulls in the empty space either side of the board.
+
+    That band sits between the top and bottom corner-mark search windows, and
+    holds nothing the scanner reads, so the artwork can be as full as it likes.
+    The right-hand skull stays below the EXIT label.
+    """
+    x, y, size, _ = board
+    cell = size / L.GRID
+    gap = 10.0
+
+    room = x - gap - L.MARGIN
+    width = min(112.0, size * 0.40, room)
+    height = width * 333 / 441
+    pdf.drawImage(str(LEFT_ART), L.MARGIN + (room - width) / 2, y + size * 0.62 - height / 2,
+                  width, height, preserveAspectRatio=True, anchor="c")
+
+    left = x + size + gap
+    room = L.PAGE_W - L.MARGIN - left
+    exit_bottom = y + size - 3 * cell - 4
+    side = min(104.0, size * 0.37, room, exit_bottom - (y + 4))
+    pdf.drawImage(str(RIGHT_ART), left + (room - side) / 2, y + 4, side, side,
+                  preserveAspectRatio=True, anchor="c")
+
+
 def draw_team_id(pdf, boxes, label_baseline):
     pdf.setFillColor(INK)
     pdf.setFont("Helvetica-Bold", 8)
-    pdf.drawString(boxes[0][0], label_baseline, "TEAM ID - ONE CHARACTER PER BOX")
+    pdf.drawString(boxes[0][0], label_baseline, "TEAM ID \u00b7 ONE CHARACTER PER BOX")
     for box_x, box_y, box_w, box_h in boxes:
         pdf.setStrokeColor(INK)
         pdf.setLineWidth(1.2)
@@ -127,9 +167,9 @@ def draw_answer_table(pdf, page):
     per_column = page["rowsPerColumn"]
     x, _, width, _ = page["table"]
 
-    pdf.setFillColor(INK)
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(x, page["tableTitleBaseline"], "WRITE YOUR SOLUTION")
+    pdf.setFillColor(BRAND)
+    pdf.setFont("Times-Bold", 15)
+    pdf.drawString(x, page["tableTitleBaseline"], "Your solution")
     pdf.setFont("Helvetica", 7.5)
     pdf.setFillColor(MUTED)
     note = ("Print one character in each cell. Fill the first column, then the next."
@@ -141,7 +181,7 @@ def draw_answer_table(pdf, page):
     for block in blocks:
         block_x, block_y, block_w, block_h = block["table"]
         header_x, header_y, header_w, header_h = block["header"]
-        pdf.setFillColor(INK)
+        pdf.setFillColor(BRAND)
         pdf.rect(header_x, header_y, header_w, header_h, fill=1, stroke=0)
         for label, (cell_x, cell_w) in zip(labels, block["edges"]):
             centered_text(pdf, label, cell_x, header_y + header_h / 2 - 2.5, cell_w,
@@ -168,28 +208,32 @@ def draw_puzzle_page(pdf, manifest, puzzle, page, overlay=None):
     pdf.rect(0, 0, L.PAGE_W, L.PAGE_H, fill=1, stroke=0)
     registration_marks(pdf)
 
-    pdf.setFillColor(RED)
-    pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawString(L.MARGIN, 750, f"{manifest['title'].upper()} / {manifest['round'].upper()}")
-    pdf.setFillColor(INK)
-    pdf.setFont("Helvetica-Bold", 24)
-    pdf.drawString(L.MARGIN, page["titleBaseline"],
+    # Kept clear of the top-left corner mark: a dark shape touching it would
+    # merge with it in a photo and the scanner would reject the pair.
+    pdf.drawImage(str(BADGE_ART), L.MARGIN + 2, 694, 54, 54, preserveAspectRatio=True, anchor="c")
+    pdf.setFillColor(BRAND)
+    pdf.setFont("Helvetica-Bold", 8.5)
+    pdf.drawString(HEADER_X, 742, f"{manifest['title'].upper()} \u00b7 {manifest['round'].upper()}")
+    pdf.setFont("Times-Bold", 27)
+    pdf.drawString(HEADER_X, page["titleBaseline"] - 4,
                    f"Puzzle {puzzle['index']} \u00b7 {levels.name(puzzle['level'])}")
     pdf.setFont("Helvetica", 8)
     pdf.setFillColor(MUTED)
-    pdf.drawString(L.MARGIN + 1, 706, "Move the red X car through the exit. Record every move below in order.")
+    pdf.drawString(HEADER_X + 1, 703, "Move the maroon X car out through the exit. Record every move below, in order.")
 
     badge_x, badge_y, badge_w, badge_h = page["pointsBadge"]
-    pdf.setFillColor(YELLOW)
-    pdf.roundRect(badge_x, badge_y, badge_w, badge_h, 3, fill=1, stroke=0)
+    pdf.setFillColor(BADGE)
+    pdf.roundRect(badge_x, badge_y, badge_w, badge_h, 4, fill=1, stroke=0)
     points = puzzle["points"]
-    centered_text(pdf, f"{points} POINT{'S' if points != 1 else ''}", badge_x, badge_y + badge_h / 2 - 3, badge_w, size=8)
+    centered_text(pdf, f"{points} POINT{'S' if points != 1 else ''}", badge_x, badge_y + badge_h / 2 - 3, badge_w,
+                  size=8.5, color=BRAND)
 
     draw_sheet_code(pdf, puzzle, page)
     draw_team_id(pdf, page["team"], page["teamLabelBaseline"])
 
     board_size = page["board"][2]
     draw_board(pdf, puzzle["cars"], page["board"], label_size=max(10, board_size * 0.057))
+    draw_fossils(pdf, page["board"])
     labels = ", ".join(car["id"] for car in puzzle["cars"])
     pdf.setFillColor(MUTED)
     pdf.setFont("Helvetica", 7.5)
@@ -215,12 +259,11 @@ def draw_key(pdf, manifest):
         chunk = manifest["puzzles"][start:start + per_page]
         pdf.setFillColor(PAPER)
         pdf.rect(0, 0, L.PAGE_W, L.PAGE_H, fill=1, stroke=0)
-        pdf.setFillColor(RED)
-        pdf.setFont("Helvetica-Bold", 9)
-        pdf.drawString(L.MARGIN, 750, "GRADER COPY / DO NOT DISTRIBUTE")
-        pdf.setFillColor(INK)
-        pdf.setFont("Helvetica-Bold", 22)
-        pdf.drawString(L.MARGIN, 722, f"Answer key {manifest['packetId']}")
+        pdf.setFillColor(BRAND)
+        pdf.setFont("Helvetica-Bold", 8.5)
+        pdf.drawString(L.MARGIN, 750, "GRADER COPY \u00b7 DO NOT DISTRIBUTE")
+        pdf.setFont("Times-Bold", 24)
+        pdf.drawString(L.MARGIN, 722, f"Answer key \u00b7 {manifest['packetId']}")
         pdf.setFont("Helvetica", 8)
         pdf.setFillColor(MUTED)
         pdf.drawString(
@@ -235,9 +278,9 @@ def draw_key(pdf, manifest):
             board_rect = [L.MARGIN, top - block_h + 12, 92.0, 92.0]
             draw_board(pdf, puzzle["cars"], board_rect, label_size=7, exit_label=False)
             text_x = L.MARGIN + 116
-            pdf.setFillColor(INK)
-            pdf.setFont("Helvetica-Bold", 13)
-            pdf.drawString(text_x, top - 12, f"{puzzle['code']}")
+            pdf.setFillColor(BRAND)
+            pdf.setFont("Times-Bold", 14)
+            pdf.drawString(text_x, top - 12, f"Puzzle {puzzle['index']} \u00b7 {puzzle['code']}")
             pdf.setFont("Helvetica", 8)
             pdf.setFillColor(MUTED)
             pdf.drawString(

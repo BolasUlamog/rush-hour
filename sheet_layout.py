@@ -29,6 +29,7 @@ ROW_H_MAX = 32.0
 COLUMNS = (30.0, 130.0, 200.0, 168.0)  # number, car, direction, spaces
 MIN_ROWS = 8
 MAX_ROWS = 48
+PRINTED_ROWS = 33          # every new sheet: three equal blocks of eleven rows
 ROWS_PER_COLUMN = 16      # beyond this the answer table splits into side-by-side blocks
 MAX_COLUMNS = 3
 BLOCK_GAP = {2: 20.0, 3: 16.0}
@@ -52,13 +53,19 @@ TITLE_BASELINE = 722.0
 
 
 def row_count(shortest_moves: int) -> int:
-    """Answer rows to print: room to be inefficient, but still one page."""
-    return max(MIN_ROWS, min(MAX_ROWS, int(shortest_moves) + 4))
+    """Answer rows on every newly printed student sheet, whatever the puzzle.
+
+    33 is three equal blocks of 11 under the existing one-block-per-16-rows rule,
+    so it needs no special case and lays out exactly as any older 33-row sheet
+    did. It also leaves three spare rows above the 30-move cap for a student who
+    crosses out a mistake, as the sheet tells them to.
+    """
+    return PRINTED_ROWS
 
 
 def fits_on_one_page(shortest_moves: int) -> bool:
-    """A sheet prints one row per move plus spares, and must stay one page."""
-    return int(shortest_moves) + 4 <= MAX_ROWS
+    """A generated key must fit in the fixed student answer template."""
+    return int(shortest_moves) <= PRINTED_ROWS
 
 
 def mark_centers() -> dict[str, list[float]]:
@@ -162,7 +169,7 @@ def layout(rows: int) -> dict:
         "answerRows": answer_rows,
         "board": [(PAGE_W - board_size) / 2, board_bottom, board_size, board_size],
         "boardCaptionBaseline": board_caption,
-        "pointsBadge": [424.0, 712.0, 70.0, 28.0],
+        "pointsBadge": [356.0, 712.0, 138.0, 28.0],
         "qr": list(QR_RECT),
     }
 

@@ -161,7 +161,7 @@ def draw_team_id(pdf, boxes, label_baseline):
 
 
 def draw_answer_table(pdf, page):
-    """Draw the answer table: one block for short puzzles, side by side for long ones."""
+    """Draw the fixed answer template in reading order across its blocks."""
     blocks = page["blocks"]
     rows = page["answerRows"]
     per_column = page["rowsPerColumn"]
@@ -170,11 +170,6 @@ def draw_answer_table(pdf, page):
     pdf.setFillColor(BRAND)
     pdf.setFont("Times-Bold", 15)
     pdf.drawString(x, page["tableTitleBaseline"], "Your solution")
-    pdf.setFont("Helvetica", 7.5)
-    pdf.setFillColor(MUTED)
-    note = ("Print one character in each cell. Fill the first column, then the next."
-            if len(blocks) > 1 else "Print one character in each cell. Do not combine columns.")
-    pdf.drawRightString(x + width, page["tableTitleBaseline"], note)
 
     labels = ["#", "CAR", "DIR", "SPACES"] if len(blocks) > 2 else ["#", "CAR", "DIRECTION", "SPACES"]
     header_size = 6.5 if len(blocks) > 2 else 8
@@ -225,7 +220,8 @@ def draw_puzzle_page(pdf, manifest, puzzle, page, overlay=None):
     pdf.setFillColor(BADGE)
     pdf.roundRect(badge_x, badge_y, badge_w, badge_h, 4, fill=1, stroke=0)
     points = puzzle["points"]
-    centered_text(pdf, f"{points} POINT{'S' if points != 1 else ''}", badge_x, badge_y + badge_h / 2 - 3, badge_w,
+    badge = f"{levels.name(puzzle['level']).upper()} \u00b7 {points} PT{'S' if points != 1 else ''}"
+    centered_text(pdf, badge, badge_x, badge_y + badge_h / 2 - 3, badge_w,
                   size=8.5, color=BRAND)
 
     draw_sheet_code(pdf, puzzle, page)
@@ -234,11 +230,6 @@ def draw_puzzle_page(pdf, manifest, puzzle, page, overlay=None):
     board_size = page["board"][2]
     draw_board(pdf, puzzle["cars"], page["board"], label_size=max(10, board_size * 0.057))
     draw_fossils(pdf, page["board"])
-    labels = ", ".join(car["id"] for car in puzzle["cars"])
-    pdf.setFillColor(MUTED)
-    pdf.setFont("Helvetica", 7.5)
-    pdf.drawCentredString(L.PAGE_W / 2, page["boardCaptionBaseline"], f"Valid car labels for this puzzle: {labels}")
-
     draw_answer_table(pdf, page)
 
     pdf.setFillColor(MUTED)

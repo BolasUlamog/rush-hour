@@ -82,10 +82,20 @@ that can go after every grading device has opened the renamed app.
 
 ## Difficulty
 
-Three tiers, `easy` 7-12 moves / `medium` 13-20 / `hard` 21-40, worth 4 / 8 / 15
+Three tiers, `easy` 7-12 moves / `medium` 13-20 / `hard` 21-30, worth 4 / 8 / 15
 points. There used to be a 3-6 move `easy` tier below these and a `grandmaster`
 above; on 2026-09-20 the bottom one was dropped and the rest shifted down a name,
 because the whole packet needed to be harder.
+
+Every new sheet uses the same 33-row answer table in three equal blocks of 11,
+whatever the puzzle: 33 because the layout already gives one block per 16 rows,
+so it needs no special case, and it leaves three spare rows above the 30-move cap
+for crossed-out mistakes. There is deliberately no worked example on the sheet;
+proctors demonstrate one on paper. The physical piece inventory is fixed as well:
+X is separate, A-J are the ten two-space traffic cars, and K-O are the five
+three-space trucks. Do not return to assigning IDs
+by placement order; that would make one labeled printed piece change size between
+puzzles.
 
 Length alone does not make a puzzle interesting, so each tier also ranks the
 boards it finds by how much thought they demand — see `routeInsight` in

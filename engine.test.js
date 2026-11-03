@@ -83,7 +83,17 @@ for (const puzzle of built.puzzles) {
   assert.equal(puzzle.solution.length, puzzle.shortestMoves);
   assert.equal(engine.validateSolution(puzzle.cars, puzzle.solution.join(",")).status, "success");
   // Every car label has to survive the QR round trip as a single character.
-  for (const car of puzzle.cars) assert.match(car.id, /^[A-Z0-9]$/);
+  for (const car of puzzle.cars) {
+    assert.match(car.id, /^[A-Z0-9]$/);
+    if (car.id === "X") continue;
+    assert.ok(
+      (car.length === 2 && sets.SMALL_CAR_IDS.includes(car.id)) ||
+      (car.length === 3 && sets.TRUCK_IDS.includes(car.id)),
+      `${car.id} must keep the same size in every physical set`
+    );
+  }
+  assert.ok(puzzle.cars.filter(car => car.id !== "X" && car.length === 2).length <= 10);
+  assert.ok(puzzle.cars.filter(car => car.length === 3).length <= 5);
 }
 assert.ok(
   built.puzzles.find(p => p.level === "hard").shortestMoves >= 21,
@@ -116,6 +126,19 @@ assert.ok(
     `sifting widened the solution cone on ${compared - siftedNarrower} of ${compared} boards`);
   assert.ok(forcesRetreat / compared >= 0.5,
     `only ${forcesRetreat} of ${compared} sifted starts force the X car backwards`);
+}
+
+// Grading checks that a route works, never that it matches the answer key:
+// puzzles have many solutions, and a longer one earns the same points. Take a
+// generated puzzle and pad its key with a pointless move and its undo.
+{
+  const puzzle = built.puzzles[0];
+  const first = engine.legalMoves(puzzle.cars)[0].move;
+  const undo = { ...first, direction: { L: "R", R: "L", U: "D", D: "U" }[first.direction] };
+  const detour = [engine.formatMove(first), engine.formatMove(undo), ...puzzle.solution];
+  assert.notDeepEqual(detour, puzzle.solution);
+  assert.equal(engine.validateSolution(puzzle.cars, detour.join(",")).status, "success",
+    "a longer route that still frees X must be accepted, not compared to the key");
 }
 
 console.log("All Rush Hour engine tests passed.");

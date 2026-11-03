@@ -24,6 +24,7 @@ from pathlib import Path
 
 import levels
 import sheet_builder
+import sheet_layout
 
 APP_DIR = Path(__file__).resolve().parent
 
@@ -115,6 +116,14 @@ def main() -> int:
         except Exception as error:
             failures.append(f"{kind}: {error}")
             print(f"FAIL could not build the {kind}: {error}")
+
+    # Every sheet, whatever its puzzle, gets the same three equal answer blocks.
+    for puzzle in built["puzzles"]:
+        rows = sheet_layout.row_count(puzzle["shortestMoves"])
+        page = sheet_layout.layout(rows)
+        if rows != sheet_layout.PRINTED_ROWS or len(page["blocks"]) != 3 or rows % 3:
+            failures.append(f"{puzzle['level']} got {rows} rows in {len(page['blocks'])} blocks, "
+                            f"not {sheet_layout.PRINTED_ROWS} in three equal blocks")
 
     print(f"\ntiers checked: {', '.join(f'{p['level']}={p['shortestMoves']} moves' for p in built['puzzles'])}")
     if failures:

@@ -34,7 +34,7 @@
   const RECIPES = {
     easy: { band: [7, 12], cars: 11, trucks: 0.30, vertical: 0.65, prefer: "spread", sift: 24, pool: 3 },
     medium: { band: [13, 20], cars: 13, trucks: 0.30, vertical: 0.70, prefer: "hardest", sift: 32, pool: 3 },
-    hard: { band: [21, 40], cars: 14, trucks: 0.30, vertical: 0.70, prefer: "hardest", sift: 32, pool: 2 }
+    hard: { band: [21, 30], cars: 14, trucks: 0.30, vertical: 0.70, prefer: "hardest", sift: 32, pool: 2 }
   };
   const DEFAULTS = {
     counts: { easy: 4, medium: 4, hard: 2 },
@@ -44,7 +44,13 @@
     stateLimit: 400000
   };
   const SIZE = 6;
-  const CAR_IDS = "ABCDEFGHJKLMNPQRSTUV";   // I and O look like 1 and 0 by hand
+  // These IDs match one reusable physical set: the ten two-space cars are
+  // always A-J and the five three-space trucks are always K-O, so a lettered
+  // piece is the same size in every puzzle. I and O look like 1 and 0 by hand,
+  // but never where it matters: the car column only accepts this board's own
+  // letters and the spaces column only accepts 1-5.
+  const SMALL_CAR_IDS = "ABCDEFGHIJ";
+  const TRUCK_IDS = "KLMNO";
   const TARGET_ROW = 2;
 
   function withDefaults(config) {
@@ -88,11 +94,19 @@
     const grid = new Uint8Array(SIZE * SIZE);
     grid[TARGET_ROW * SIZE] = 1;
     grid[TARGET_ROW * SIZE + 1] = 1;
+    let smallCars = 0;
+    let trucks = 0;
 
     for (let placed = 0; placed < recipe.cars - 1; placed++) {
       for (let attempt = 0; attempt < 150; attempt++) {
         const vertical = random() < recipe.vertical;
-        const length = random() < recipe.trucks ? 3 : 2;
+        let length = random() < recipe.trucks ? 3 : 2;
+        // A packet must never ask for more pieces than the physical set has.
+        // Once one size is exhausted, draw from the other pool.
+        if (length === 2 && smallCars >= SMALL_CAR_IDS.length) length = 3;
+        if (length === 3 && trucks >= TRUCK_IDS.length) length = 2;
+        if ((length === 2 && smallCars >= SMALL_CAR_IDS.length) ||
+            (length === 3 && trucks >= TRUCK_IDS.length)) break;
         const line = Math.floor(random() * SIZE);
         const start = Math.floor(random() * (SIZE - length + 1));
         if (!vertical && line === TARGET_ROW) continue;
@@ -107,7 +121,7 @@
           grid[cell] = placed + 2;
         }
         cars.push({
-          id: CAR_IDS[placed],
+          id: length === 2 ? SMALL_CAR_IDS[smallCars++] : TRUCK_IDS[trucks++],
           row: vertical ? start : line,
           col: vertical ? line : start,
           length,
@@ -247,7 +261,7 @@
   }
 
   return {
-    LEVELS, LEVEL_CODE, LEVEL_NAMES, RECIPES, DEFAULTS,
+    LEVELS, LEVEL_CODE, LEVEL_NAMES, RECIPES, DEFAULTS, SMALL_CAR_IDS, TRUCK_IDS,
     withDefaults, createRandom, signature, randomLayout, attempt, moreDemanding, buildLevel,
     finalize, buildPuzzleSet
   };

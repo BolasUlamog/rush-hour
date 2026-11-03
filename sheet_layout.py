@@ -169,7 +169,6 @@ def layout(rows: int) -> dict:
         "answerRows": answer_rows,
         "board": [(PAGE_W - board_size) / 2, board_bottom, board_size, board_size],
         "boardCaptionBaseline": board_caption,
-        "pointsBadge": [356.0, 712.0, 138.0, 28.0],
         "qr": list(QR_RECT),
     }
 

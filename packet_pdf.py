@@ -33,7 +33,6 @@ MUTED = HexColor("#87656F")      # --muted
 LINE = HexColor("#D8AFB7")       # --line
 PAPER = white                    # no tint to print, and the cleanest ground for the scanner
 GRID = HexColor("#F1DCE1")       # the board's floor
-BADGE = HexColor("#F6DDE3")
 # Every car but X stays light, so its maroon letter reads clearly and X -- the
 # one dark car -- is unmistakable even off a black-and-white printer.
 COLORS = [
@@ -209,20 +208,17 @@ def draw_puzzle_page(pdf, manifest, puzzle, page, overlay=None):
     pdf.setFillColor(BRAND)
     pdf.setFont("Helvetica-Bold", 8.5)
     pdf.drawString(HEADER_X, 742, f"{manifest['title'].upper()} \u00b7 {manifest['round'].upper()}")
-    pdf.setFont("Times-Bold", 27)
-    pdf.drawString(HEADER_X, page["titleBaseline"] - 4,
-                   f"Puzzle {puzzle['index']} \u00b7 {levels.name(puzzle['level'])}")
+    points = puzzle["points"]
+    title = (f"Puzzle {puzzle['index']} \u00b7 {levels.name(puzzle['level'])} \u00b7 "
+             f"{points} pt{'s' if points != 1 else ''}")
+    # Runs up to the QR's quiet zone; a long title shrinks rather than touching it.
+    room = L.QR_RECT[0] - L.QR_QUIET - 10 - HEADER_X
+    size = min(27.0, 27.0 * room / stringWidth(title, "Times-Bold", 27))
+    pdf.setFont("Times-Bold", size)
+    pdf.drawString(HEADER_X, page["titleBaseline"] - 4, title)
     pdf.setFont("Helvetica", 8)
     pdf.setFillColor(MUTED)
     pdf.drawString(HEADER_X + 1, 703, "Move the maroon X car out through the exit. Record every move below, in order.")
-
-    badge_x, badge_y, badge_w, badge_h = page["pointsBadge"]
-    pdf.setFillColor(BADGE)
-    pdf.roundRect(badge_x, badge_y, badge_w, badge_h, 4, fill=1, stroke=0)
-    points = puzzle["points"]
-    badge = f"{levels.name(puzzle['level']).upper()} \u00b7 {points} PT{'S' if points != 1 else ''}"
-    centered_text(pdf, badge, badge_x, badge_y + badge_h / 2 - 3, badge_w,
-                  size=8.5, color=BRAND)
 
     draw_sheet_code(pdf, puzzle, page)
     draw_team_id(pdf, page["team"], page["teamLabelBaseline"])

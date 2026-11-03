@@ -39,7 +39,7 @@ def clean_puzzles(raw: object) -> list[dict]:
             "code": str(item.get("code") or f"RH-{index:03d}").upper(),
             "level": level,
             "points": max(0, min(99, int(item.get("points", 0)))),
-            "shortestMoves": max(1, min(40, int(item.get("shortestMoves", len(solution) or 1)))),
+            "shortestMoves": max(1, min(30, int(item.get("shortestMoves", len(solution) or 1)))),
             "cars": [{
                 "id": str(car["id"]).upper(),
                 "row": int(car["row"]),

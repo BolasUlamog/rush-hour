@@ -46,7 +46,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--easy", type=int, default=4, help="number of easy puzzles (7-12 moves)")
     parser.add_argument("--medium", type=int, default=4, help="number of medium puzzles (13-20 moves)")
-    parser.add_argument("--hard", type=int, default=2, help="number of hard puzzles (21-40 moves)")
+    parser.add_argument("--hard", type=int, default=2, help="number of hard puzzles (21-30 moves)")
 
     parser.add_argument("--points-easy", type=int, default=4)
     parser.add_argument("--points-medium", type=int, default=8)

@@ -17,16 +17,16 @@ Each page prints a QR square holding the board, the number of answer rows on
 that page, and what the puzzle is worth:
 
 ```
-RH1*RH-M-004*5*10*X202HA333VB422V…
+RH1*RH-M-004*5*33*X202HA333VB422V…
      code   pts rows  cars (id,row,col,length,orientation)
 ```
 
 So the grading station never needs a packet list, a database, or a manifest. It
 decodes the square, **solves the board itself** to find the shortest route, reads
-the handwriting, and checks the student's moves against the rules. A hard
-sheet needs forty-odd answer rows, so its table splits into two or three
-side-by-side blocks numbered in reading order; the scanner only walks the list of
-cells and never needs to know how a sheet was laid out. A sheet can be
+the handwriting, and checks the student's moves against the rules. Every new
+sheet prints the same 33-row answer table in three equal blocks, numbered in reading order;
+the scanner only walks the list of cells and never needs to know how a sheet was
+laid out. A sheet can be
 graded on any machine running this app, in any order, months later. Its position
 on the page also tells the scanner which way up the photo is.
 
@@ -47,13 +47,18 @@ server is asked only to lay the chosen boards out as PDF pages.
 
 | tier | shortest solution | points | answer blocks |
 | --- | --- | --- | --- |
-| Easy | 7-12 moves | 4 | 1-2 |
+| Easy | 7-12 moves | 4 | 2 |
 | Medium | 13-20 moves | 8 | 2 |
-| Hard | 21-40 moves | 15 | 2-3 |
+| Hard | 21-30 moves | 15 | 2 |
 
 A move is one slide of one car, any distance — the convention Rush Hour uses, and
 the one its published move counts refer to. For scale, ThinkFun's own expert cards
 run 20 to 50 moves and the hardest board that exists takes 51.
+
+The generator also matches the reusable 3D-printed inventory: X is the separate
+escape car, A-J are always the ten available two-space traffic cars, and
+K-O are always the five available three-space trucks. A letter never changes
+piece size between puzzles.
 
 Difficulty does **not** come from adding more cars. Measured over thousands of
 boards, extra traffic makes puzzles *easier*, because a crowded board has fewer
@@ -61,7 +66,8 @@ legal moves; 18 cars produced shorter solutions than 12. It comes from where the
 puzzle *starts*. `search.js` walks a board's entire state graph, measures every
 reachable position's distance from the exit, and starts the puzzle at a far one.
 Sampling random start positions — the obvious approach — tops out around 12
-moves; searching for far positions reaches 40.
+moves; tournament packets cap generated solutions at 30 so every page can use
+the same answer template: 33 rows, so three spare for crossed-out mistakes.
 
 Only about 2% of boards support a 25-move-plus start, so the generator tries many
 boards for one hard puzzle; expect a few seconds each. Set a seed to reproduce a
